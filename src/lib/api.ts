@@ -38,3 +38,33 @@ export async function apiPost<TResponse, TBody>(
 
   return payload as TResponse
 }
+
+export interface CurrentUserProfile {
+  id: string
+  identityUserId: string
+  nombres: string
+  apellidos: string
+  email: string
+  rol: string
+  activo: boolean
+}
+
+export async function fetchCurrentUser(accessToken: string): Promise<CurrentUserProfile> {
+  const response = await fetch(`${API_BASE_URL}/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  const payload = (await response.json()) as CurrentUserProfile | { message?: string }
+
+  if (!response.ok) {
+    throw new Error(
+      'message' in payload && payload.message
+        ? payload.message
+        : `Request failed with status ${response.status}`,
+    )
+  }
+
+  return payload as CurrentUserProfile
+}
