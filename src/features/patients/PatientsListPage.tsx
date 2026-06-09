@@ -1,70 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { Search } from 'lucide-react'
+import { Search, UserPlus } from 'lucide-react'
+
+import { getMockSession } from '@/features/auth/mockAuth'
+import { apiGet } from '@/lib/api'
 
 type PatientRow = {
   id: string
   rut: string
   nombres: string
   apellidos: string
-  fecha_nacimiento: string | null
+  fechaNacimiento: string | null
   sexo: string | null
   telefono: string | null
   email: string | null
   direccion: string | null
-  zona: string | null
 }
-
-const mockPatients: PatientRow[] = [
-  {
-    id: '1',
-    rut: '14.223.889-7',
-    nombres: 'Elena Maria',
-    apellidos: 'Rojas Fuentes',
-    fecha_nacimiento: '1957-09-12',
-    sexo: 'FEMENINO',
-    telefono: '+56 9 7812 4432',
-    email: 'elena.rojas@correo.cl',
-    direccion: 'Pasaje Los Aromos 145, Casa 4',
-    zona: 'Illapel Centro',
-  },
-  {
-    id: '2',
-    rut: '9.334.100-2',
-    nombres: 'Luis Alberto',
-    apellidos: 'Gonzalez Vega',
-    fecha_nacimiento: '1948-02-03',
-    sexo: 'MASCULINO',
-    telefono: '+56 9 6671 1020',
-    email: 'luis.gonzalez@correo.cl',
-    direccion: 'Avenida La Paz 891',
-    zona: 'Sector Norte',
-  },
-  {
-    id: '3',
-    rut: '17.005.341-9',
-    nombres: 'Patricia Andrea',
-    apellidos: 'Mella Cortes',
-    fecha_nacimiento: '1972-11-20',
-    sexo: 'FEMENINO',
-    telefono: '+56 9 5510 0044',
-    email: null,
-    direccion: 'Villa El Bosque 227',
-    zona: 'Sector Oriente',
-  },
-  {
-    id: '4',
-    rut: '12.778.600-5',
-    nombres: 'Ramon Esteban',
-    apellidos: 'Soto Araya',
-    fecha_nacimiento: null,
-    sexo: null,
-    telefono: '+56 9 4422 3011',
-    email: 'ramon.soto@correo.cl',
-    direccion: null,
-    zona: null,
-  },
-]
 
 const formatDate = (value: string | null) => {
   if (!value) return '-'
@@ -74,12 +25,38 @@ const formatDate = (value: string | null) => {
 
 const PatientsListPage = () => {
   const [query, setQuery] = useState('')
+  const [patients, setPatients] = useState<PatientRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+  const session = getMockSession()
+  const canCreatePatients = session?.role === 'ADMIN' || session?.role === 'COORDINADOR' || session?.role === 'SUPERVISOR'
+
+  useEffect(() => {
+    let isMounted = true
+
+    apiGet<PatientRow[]>('/pacientes')
+      .then(response => {
+        if (isMounted) setPatients(response)
+      })
+      .catch(fetchError => {
+        if (isMounted) {
+          setError(fetchError instanceof Error ? fetchError.message : 'No fue posible cargar pacientes.')
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const filteredPatients = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    if (!normalizedQuery) return mockPatients
+    if (!normalizedQuery) return patients
 
-    return mockPatients.filter(patient => {
+    return patients.filter(patient => {
       const fullName = `${patient.nombres} ${patient.apellidos}`.toLowerCase()
 
       return (
@@ -87,10 +64,10 @@ const PatientsListPage = () => {
         fullName.includes(normalizedQuery) ||
         (patient.telefono || '').toLowerCase().includes(normalizedQuery) ||
         (patient.email || '').toLowerCase().includes(normalizedQuery) ||
-        (patient.zona || '').toLowerCase().includes(normalizedQuery)
+        (patient.direccion || '').toLowerCase().includes(normalizedQuery)
       )
     })
-  }, [query])
+  }, [patients, query])
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-8'>
@@ -102,6 +79,15 @@ const PatientsListPage = () => {
               Vista basada en tabla <code>pacientes</code> de <code>BD/bd.sql</code>.
             </p>
           </div>
+          {canCreatePatients ? (
+            <a
+              href='/patients/new'
+              className='inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800'
+            >
+              <UserPlus className='size-4' />
+              Registrar paciente
+            </a>
+          ) : null}
         </header>
 
         <div className='mb-4 flex w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2'>
@@ -109,13 +95,19 @@ const PatientsListPage = () => {
           <input
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder='Buscar por RUT, nombre, telefono, email o zona'
+            placeholder='Buscar por RUT, nombre, telefono, email o direccion'
             className='w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400'
           />
         </div>
 
+        {error && (
+          <div className='mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
+            {error}
+          </div>
+        )}
+
         <div className='overflow-x-auto rounded-md border border-slate-300 bg-white'>
-          <table className='w-full min-w-[1060px] text-left text-sm'>
+          <table className='w-full min-w-[960px] text-left text-sm'>
             <thead className='bg-slate-100'>
               <tr className='text-xs uppercase tracking-wide text-slate-600'>
                 <th className='px-4 py-3'>RUT</th>
@@ -126,27 +118,33 @@ const PatientsListPage = () => {
                 <th className='px-4 py-3'>Telefono</th>
                 <th className='px-4 py-3'>Email</th>
                 <th className='px-4 py-3'>Direccion</th>
-                <th className='px-4 py-3'>Zona</th>
               </tr>
             </thead>
             <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className='px-4 py-8 text-center text-sm text-slate-500'>
+                    Cargando pacientes...
+                  </td>
+                </tr>
+              )}
+
               {filteredPatients.map(patient => (
                 <tr key={patient.id} className='border-t border-slate-200 text-slate-800'>
                   <td className='px-4 py-3 font-medium'>{patient.rut}</td>
                   <td className='px-4 py-3'>{patient.nombres}</td>
                   <td className='px-4 py-3'>{patient.apellidos}</td>
-                  <td className='px-4 py-3'>{formatDate(patient.fecha_nacimiento)}</td>
+                  <td className='px-4 py-3'>{formatDate(patient.fechaNacimiento)}</td>
                   <td className='px-4 py-3'>{patient.sexo || '-'}</td>
                   <td className='px-4 py-3'>{patient.telefono || '-'}</td>
                   <td className='px-4 py-3'>{patient.email || '-'}</td>
                   <td className='px-4 py-3'>{patient.direccion || '-'}</td>
-                  <td className='px-4 py-3'>{patient.zona || '-'}</td>
                 </tr>
               ))}
 
-              {filteredPatients.length === 0 && (
+              {!isLoading && filteredPatients.length === 0 && (
                 <tr>
-                  <td colSpan={9} className='px-4 py-8 text-center text-sm text-slate-500'>
+                  <td colSpan={8} className='px-4 py-8 text-center text-sm text-slate-500'>
                     No hay pacientes que coincidan con la busqueda.
                   </td>
                 </tr>

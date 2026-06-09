@@ -1,10 +1,43 @@
-const DEFAULT_API_URL = 'http://localhost:3000'
+import { getMockAuthHeaders } from '@/features/auth/mockAuth'
 
+const DEFAULT_API_URL = 'http://localhost:3000'
 export const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL
 
 type ApiError = Error & {
   status?: number
   payload?: unknown
+}
+
+async function parseApiResponse<TResponse>(response: Response): Promise<TResponse> {
+  const contentType = response.headers.get('content-type') || ''
+  const isJson = contentType.includes('application/json')
+  const payload = (isJson ? await response.json() : await response.text()) as
+    | TResponse
+    | { message?: string | string[] }
+
+  if (!response.ok) {
+    const message =
+      typeof payload === 'string'
+        ? payload
+        : Array.isArray(payload?.message)
+          ? payload.message.join(', ')
+          : payload?.message || `Request failed with status ${response.status}`
+
+    const error = new Error(message) as ApiError
+    error.status = response.status
+    error.payload = payload
+    throw error
+  }
+
+  return payload as TResponse
+}
+
+export async function apiGet<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: getMockAuthHeaders(),
+  })
+
+  return parseApiResponse<TResponse>(response)
 }
 
 export async function apiPost<TResponse, TBody>(
@@ -15,28 +48,37 @@ export async function apiPost<TResponse, TBody>(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getMockAuthHeaders(),
     },
     body: JSON.stringify(body),
   })
 
-  const contentType = response.headers.get('content-type') || ''
-  const isJson = contentType.includes('application/json')
-  const payload = (isJson ? await response.json() : await response.text()) as
-    | TResponse
-    | { message?: string }
+  return parseApiResponse<TResponse>(response)
+}
 
-  if (!response.ok) {
-    const error = new Error(
-      typeof payload === 'string'
-        ? payload
-        : payload?.message || `Request failed with status ${response.status}`,
-    ) as ApiError
-    error.status = response.status
-    error.payload = payload
-    throw error
-  }
+export async function apiPatch<TResponse, TBody>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getMockAuthHeaders(),
+    },
+    body: JSON.stringify(body),
+  })
 
-  return payload as TResponse
+  return parseApiResponse<TResponse>(response)
+}
+
+export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: getMockAuthHeaders(),
+  })
+
+  return parseApiResponse<TResponse>(response)
 }
 
 export interface CurrentUserProfile {
@@ -49,10 +91,11 @@ export interface CurrentUserProfile {
   activo: boolean
 }
 
-export async function fetchCurrentUser(accessToken: string): Promise<CurrentUserProfile> {
+export async function fetchCurrentUser(accessToken?: string): Promise<CurrentUserProfile> {
   const response = await fetch(`${API_BASE_URL}/me`, {
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...getMockAuthHeaders(),
     },
   })
 

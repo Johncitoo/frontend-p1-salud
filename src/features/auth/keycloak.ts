@@ -32,7 +32,7 @@ export const initKeycloakWithTimeout = (timeoutMs = 2500) =>
   withTimeout(
     initKeycloak(),
     timeoutMs,
-    'Keycloak no respondio a tiempo. Revisa VITE_KEYCLOAK_URL o si el Proyecto 12 esta arriba.',
+    'Keycloak no respondió a tiempo. Revisa VITE_KEYCLOAK_URL o si el Proyecto 12 está arriba.',
   )
 
 export const loginWithKeycloak = async () => {
