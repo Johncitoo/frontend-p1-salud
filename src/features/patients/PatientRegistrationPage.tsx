@@ -16,7 +16,7 @@ type CreatedPatient = CreatePatientPayload & {
 }
 
 const fieldClassName =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+  'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#3C6E71] focus:ring-2 focus:ring-[#3C6E71]/15'
 
 const labelClassName = 'text-sm font-medium text-slate-700'
 
@@ -68,30 +68,30 @@ const PatientRegistrationPage = () => {
       <section className='mx-auto w-full max-w-5xl'>
         <a
           href='/patients'
-          className='mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900'
+          className='mb-6 inline-flex items-center gap-2 text-sm font-semibold text-[#284B63] transition hover:text-[#3C6E71]'
         >
           <ArrowLeft className='size-4' />
           Volver al listado
         </a>
 
-        <header className='mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm'>
+        <header className='mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div className='flex items-center gap-3'>
-            <span className='rounded-full bg-blue-100 p-3 text-blue-700'>
+            <span className='rounded-2xl bg-[#3C6E71] p-3 text-white'>
               <UserPlus className='size-6' />
             </span>
             <div>
-              <p className='text-xs font-semibold uppercase tracking-wide text-blue-700'>
+              <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>
                 Gestión de pacientes
               </p>
               <h1 className='m-0 text-3xl font-semibold text-slate-900'>Registro de pacientes</h1>
               <p className='mt-2 text-sm text-slate-600'>
-                Crea un paciente en la tabla <code>pacientes</code> usando el backend de Proyecto 1.
+                Registra la información necesaria para incorporar un paciente a la atención.
               </p>
             </div>
           </div>
         </header>
 
-        <form onSubmit={handleSubmit} className='rounded-xl border border-slate-200 bg-white p-6 shadow-sm'>
+        <form onSubmit={handleSubmit} className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div className='grid gap-5 md:grid-cols-2'>
             <label className={labelClassName}>
               RUT <span className='text-red-600'>*</span>
@@ -199,14 +199,14 @@ const PatientRegistrationPage = () => {
           <div className='mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end'>
             <a
               href='/patients'
-              className='inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
+              className='inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-[#284B63] transition hover:bg-slate-100'
             >
               Cancelar
             </a>
             <button
               type='submit'
               disabled={isSubmitting || hasErrors}
-              className='inline-flex items-center justify-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400'
+              className='inline-flex items-center justify-center gap-2 rounded-lg bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63] disabled:cursor-not-allowed disabled:bg-slate-400'
             >
               <Save className='size-4' />
               {isSubmitting ? 'Registrando...' : 'Registrar paciente'}

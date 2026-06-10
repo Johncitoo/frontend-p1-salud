@@ -264,7 +264,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
             <ArrowLeft className='size-4' />
             Volver a pacientes
           </a>
-          <p className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>
+          <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>
             Profesionales y asignación
           </p>
           <h1 className='m-0 text-3xl font-semibold text-slate-900'>Profesionales y especialidades</h1>

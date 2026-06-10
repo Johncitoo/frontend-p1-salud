@@ -64,7 +64,7 @@ const UsersListPage = () => {
       <section className='mx-auto w-full max-w-7xl'>
         <header className='mb-6 flex items-end justify-between gap-4'>
           <div>
-            <p className='text-xs font-semibold uppercase tracking-wide text-red-700'>
+            <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>
               Gestión de usuarios y seguridad
             </p>
             <h1 className='m-0 text-3xl font-semibold text-slate-900'>CRUD Usuarios</h1>
@@ -75,7 +75,7 @@ const UsersListPage = () => {
           {canWriteUsers ? (
             <a
               href='/users/new'
-              className='inline-flex items-center gap-2 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800'
+              className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63]'
             >
               <UserPlus className='size-4' />
               Crear usuario

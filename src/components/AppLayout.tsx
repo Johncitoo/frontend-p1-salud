@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import {
-  Activity,
   ClipboardList,
   FileText,
+  HeartPulse,
   Layers,
   LogOut,
   MapPin,
@@ -21,13 +21,13 @@ type SidebarItem = {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { label: 'Panel',           href: '/dashboard',     icon: <Layers className='size-5' />,       roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Pacientes',       href: '/patients',      icon: <Users className='size-5' />,         roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Panel', href: '/dashboard', icon: <Layers className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Pacientes', href: '/patients', icon: <Users className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
-  { label: 'Usuarios',        href: '/users',         icon: <UserCog className='size-5' />,       roles: ['ADMIN', 'SUPERVISOR'] },
-  { label: 'Profesionales',   href: '/professionals',  icon: <Stethoscope className='size-5' />,  roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Zonas',           href: '/zones',         icon: <MapPin className='size-5' />,        roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Auditoría',       href: '/audit',         icon: <FileText className='size-5' />,      roles: ['ADMIN', 'SUPERVISOR'] },
+  { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
+  { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 type AppLayoutProps = {
@@ -38,9 +38,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const session = getMockSession()
   const pathname = window.location.pathname
 
-  if (!session) {
-    return <>{children}</>
-  }
+  if (!session) return <>{children}</>
 
   const handleLogout = () => {
     logoutMock()
@@ -50,37 +48,40 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const visibleItems = sidebarItems.filter(item => item.roles.includes(session.role))
 
   return (
-    <div className='flex min-h-screen bg-slate-50'>
-      {/* sidebar */}
-      <aside className='fixed left-0 top-0 z-30 flex h-screen w-60 flex-col border-r border-slate-200 bg-white'>
-        {/* logo */}
-        <div className='flex items-center gap-3 border-b border-slate-200 px-5 py-4'>
-          <div className='flex items-center gap-2 rounded-lg bg-emerald-100 px-2.5 py-1.5'>
-            <Activity className='size-4 text-emerald-700' />
-            <span className='text-sm font-semibold text-emerald-800'>Salud Domiciliaria</span>
+    <div className='app-dark min-h-screen bg-[#182F3F] text-white lg:flex'>
+      <aside className='border-b border-[#3C6E71]/60 bg-[#203C50] text-white shadow-xl shadow-black/20 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r'>
+        <div className='flex items-center justify-between px-5 py-5 lg:block lg:px-6 lg:py-7'>
+          <a href='/dashboard' className='flex items-center gap-3'>
+            <span className='grid size-11 place-items-center rounded-2xl bg-[#284B63] text-white shadow-md shadow-[#284B63]/15'>
+              <HeartPulse className='size-6' aria-hidden='true' />
+            </span>
+            <span>
+              <span className='block text-[10px] font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Red asistencial</span>
+              <span className='block text-base font-semibold tracking-tight text-white'>Salud en Casa</span>
+            </span>
+          </a>
+          <div className='rounded-full bg-[#3C6E71] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white lg:mt-5 lg:inline-flex'>
+            {session.role}
           </div>
         </div>
 
-        {/* nav */}
-        <nav className='flex-1 overflow-y-auto px-3 py-4'>
-          <p className='mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-slate-400'>
-            Navegación
-          </p>
-          <ul className='space-y-0.5'>
+        <nav className='overflow-x-auto px-3 pb-4 lg:flex-1 lg:overflow-y-auto lg:px-4 lg:py-3'>
+          <p className='mb-3 hidden px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#9CBFC1] lg:block'>Navegación</p>
+          <ul className='flex gap-1 lg:block lg:space-y-1'>
             {visibleItems.map(item => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
               return (
-                <li key={item.href}>
+                <li key={item.href} className='shrink-0'>
                   <a
                     href={item.href}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-emerald-50 text-emerald-800'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        ? 'bg-[#3C6E71] text-white shadow-md shadow-black/10'
+                        : 'text-[#D9D9D9] hover:bg-[#3C6E71]/35 hover:text-white'
                     }`}
                   >
                     {item.icon}
-                    {item.label}
+                    <span>{item.label}</span>
                   </a>
                 </li>
               )
@@ -88,15 +89,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </ul>
         </nav>
 
-        {/* user + logout */}
-        <div className='border-t border-slate-200 px-5 py-4'>
-          <div className='mb-3'>
-            <p className='text-sm font-medium text-slate-900'>{session.label}</p>
-            <p className='text-xs text-slate-500'>{session.role}</p>
+        <div className='hidden border-t border-[#3C6E71]/45 p-4 lg:block'>
+          <div className='mb-3 rounded-2xl border border-[#3C6E71]/35 bg-[#284B63] p-3.5'>
+            <p className='text-sm font-semibold text-white'>{session.label}</p>
+            <p className='mt-1 text-xs font-medium text-[#D9D9D9]'>Sesión mock activa</p>
           </div>
           <button
             onClick={handleLogout}
-            className='flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50'
+            className='flex w-full items-center justify-center gap-2 rounded-xl border border-[#3C6E71] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#3C6E71]'
           >
             <LogOut className='size-4' />
             Cerrar sesión
@@ -104,8 +104,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       </aside>
 
-      {/* main content */}
-      <main className='ml-60 flex-1'>{children}</main>
+      <main className='min-w-0 flex-1 lg:ml-64'>{children}</main>
     </div>
   )
 }

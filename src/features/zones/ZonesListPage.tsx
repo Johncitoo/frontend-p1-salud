@@ -61,8 +61,8 @@ const ZonesListPage = () => {
       <section className='mx-auto w-full max-w-7xl'>
         <header className='mb-6 flex items-end justify-between gap-4'>
           <div>
-            <p className='text-xs font-semibold uppercase tracking-wide text-red-700'>
-              Gestión de usuarios y seguridad
+            <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>
+              Cobertura territorial
             </p>
             <h1 className='m-0 text-3xl font-semibold text-slate-900'>CRUD Zonas</h1>
             <p className='mt-2 text-sm text-slate-600'>
@@ -72,7 +72,7 @@ const ZonesListPage = () => {
           {canWriteZones ? (
             <a
               href='/zones/new'
-              className='inline-flex items-center gap-2 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800'
+              className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63]'
             >
               <MapPinPlus className='size-4' />
               Crear zona

@@ -72,17 +72,18 @@ const PatientsListPage = () => {
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-8'>
       <section className='mx-auto w-full max-w-7xl'>
-        <header className='mb-6 flex items-end justify-between gap-4'>
+        <header className='mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end'>
           <div>
+            <p className='mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>Gestión clínica</p>
             <h1 className='m-0 text-3xl font-semibold text-slate-900'>Listado de pacientes</h1>
             <p className='mt-2 text-sm text-slate-600'>
-              Vista basada en tabla <code>pacientes</code> de <code>BD/bd.sql</code>.
+              Consulta y encuentra rápidamente la información de atención registrada.
             </p>
           </div>
           {canCreatePatients ? (
             <a
               href='/patients/new'
-              className='inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800'
+              className='inline-flex items-center justify-center gap-2 rounded-xl bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63]'
             >
               <UserPlus className='size-4' />
               Registrar paciente
@@ -90,7 +91,7 @@ const PatientsListPage = () => {
           ) : null}
         </header>
 
-        <div className='mb-4 flex w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2'>
+        <div className='mb-4 flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-[#3C6E71] focus-within:ring-2 focus-within:ring-[#3C6E71]/15'>
           <Search className='size-4 text-slate-500' />
           <input
             value={query}
@@ -106,7 +107,7 @@ const PatientsListPage = () => {
           </div>
         )}
 
-        <div className='overflow-x-auto rounded-md border border-slate-300 bg-white'>
+        <div className='overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm'>
           <table className='w-full min-w-[960px] text-left text-sm'>
             <thead className='bg-slate-100'>
               <tr className='text-xs uppercase tracking-wide text-slate-600'>
@@ -130,7 +131,7 @@ const PatientsListPage = () => {
               )}
 
               {filteredPatients.map(patient => (
-                <tr key={patient.id} className='border-t border-slate-200 text-slate-800'>
+                <tr key={patient.id} className='border-t border-slate-200 text-slate-800 transition hover:bg-slate-100'>
                   <td className='px-4 py-3 font-medium'>{patient.rut}</td>
                   <td className='px-4 py-3'>{patient.nombres}</td>
                   <td className='px-4 py-3'>{patient.apellidos}</td>

@@ -1,30 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Activity, CalendarDays, CheckCircle2, Clock3, ShieldCheck } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  HeartPulse,
+  MapPin,
+  ShieldCheck,
+  Stethoscope,
+} from 'lucide-react'
 
-import Logo from '@/components/shadcn-studio/logo'
 import LoginForm from '@/components/shadcn-studio/blocks/login-page-01/login-form'
 import { Button } from '@/components/ui/button'
 import { createLocalMockProfile, getMockSession, logoutMock } from '@/features/auth/mockAuth'
 import type { CurrentUserProfile } from '@/lib/api'
 
 const Login = () => {
-  const [isLoadingSession, setIsLoadingSession] = useState(false)
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const loadSession = () => {
     const session = getMockSession()
-    if (!session) {
-      setProfile(null)
-      setIsLoadingSession(false)
-      return
-    }
-
-    setIsLoadingSession(true)
-    setError(null)
-
-    setProfile(createLocalMockProfile(session))
-    setIsLoadingSession(false)
+    setProfile(session ? createLocalMockProfile(session) : null)
   }
 
   useEffect(() => {
@@ -34,112 +28,119 @@ const Login = () => {
   const handleLogout = () => {
     logoutMock()
     setProfile(null)
-    setError(null)
   }
 
   return (
-    <main className='min-h-screen bg-[#f5f8f7] px-4 py-8 text-left text-slate-900 sm:px-6 lg:px-8'>
-      <div className='mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-slate-200/70 lg:grid-cols-[1.05fr_0.95fr]'>
-        <section className='relative flex flex-col justify-between bg-[#eaf4f0] p-6 sm:p-8 lg:p-10'>
-          <div
-            className='absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#047857,#0891b2,#2563eb)]'
-            aria-hidden='true'
-          />
+    <main className='min-h-screen w-full bg-[#D9D9D9] p-3 text-left text-[#353535] sm:p-5 lg:p-7'>
+      <div className='mx-auto grid min-h-[calc(100vh-1.5rem)] w-full max-w-[1480px] overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_rgba(40,75,99,0.18)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-3.5rem)] lg:grid-cols-[1.08fr_0.92fr]'>
+        <section className='relative isolate hidden overflow-hidden bg-[#284B63] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14'>
+          <div className='absolute -right-28 -top-28 size-80 rounded-full border-[52px] border-[#3C6E71]/50' aria-hidden='true' />
+          <div className='absolute -bottom-36 -left-24 size-[420px] rounded-full border-[72px] border-white/5' aria-hidden='true' />
+          <div className='absolute bottom-24 right-14 h-40 w-24 rotate-12 rounded-full bg-[#3C6E71]/30 blur-2xl' aria-hidden='true' />
 
-          <div className='space-y-12'>
-            <Logo className='gap-3 text-emerald-950 [&_svg]:text-emerald-700' />
+          <div className='relative z-10 flex items-center gap-3'>
+            <span className='grid size-12 place-items-center rounded-2xl bg-white text-[#284B63] shadow-lg shadow-[#353535]/20'>
+              <HeartPulse className='size-7' strokeWidth={2.2} aria-hidden='true' />
+            </span>
+            <div>
+              <p className='text-[11px] font-semibold uppercase tracking-[0.24em] text-[#D9D9D9]'>Red asistencial</p>
+              <p className='mt-0.5 text-lg font-semibold tracking-tight text-white'>Salud en Casa</p>
+            </div>
+          </div>
 
-            <div className='max-w-xl space-y-5'>
-              <div className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/75 px-3 py-1 text-sm font-medium text-emerald-800 shadow-sm'>
-                <ShieldCheck className='size-4' aria-hidden='true' />
-                Acceso mock con roles
+          <div className='relative z-10 max-w-2xl space-y-8'>
+            <div className='inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm'>
+              <ShieldCheck className='size-4 text-[#D9D9D9]' aria-hidden='true' />
+              Gestión clínica segura y coordinada
+            </div>
+
+            <div className='space-y-5'>
+              <h1 className='m-0 max-w-2xl text-5xl font-semibold leading-[1.06] tracking-[-0.045em] text-white xl:text-6xl'>
+                Atención domiciliaria, conectada de principio a fin.
+              </h1>
+              <p className='max-w-xl text-lg leading-8 text-[#D9D9D9]'>
+                Organiza equipos, pacientes y zonas de atención desde una plataforma diseñada para acompañar el trabajo clínico en terreno.
+              </p>
+            </div>
+
+            <div className='grid max-w-xl grid-cols-3 gap-3'>
+              <div className='rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm'>
+                <Stethoscope className='mb-5 size-5 text-white' aria-hidden='true' />
+                <p className='text-sm font-semibold text-white'>Equipo clínico</p>
+                <p className='mt-1 text-xs leading-5 text-[#D9D9D9]'>Roles coordinados</p>
               </div>
-
-              <div className='space-y-3'>
-                <h1 className='m-0 max-w-xl text-4xl font-semibold leading-tight tracking-normal text-slate-950 sm:text-5xl'>
-                  Plataforma de Atención Domiciliaria
-                </h1>
-                <p className='max-w-lg text-base leading-7 text-slate-600 sm:text-lg'>
-                  Gestión de atención primaria en terreno con permisos diferenciados para coordinación, profesionales y supervisión.
-                </p>
+              <div className='rounded-2xl border border-white/10 bg-[#3C6E71] p-4 shadow-lg shadow-[#353535]/15'>
+                <MapPin className='mb-5 size-5 text-white' aria-hidden='true' />
+                <p className='text-sm font-semibold text-white'>Cobertura</p>
+                <p className='mt-1 text-xs leading-5 text-white/75'>Zonas operativas</p>
+              </div>
+              <div className='rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm'>
+                <HeartPulse className='mb-5 size-5 text-white' aria-hidden='true' />
+                <p className='text-sm font-semibold text-white'>Continuidad</p>
+                <p className='mt-1 text-xs leading-5 text-[#D9D9D9]'>Atención trazable</p>
               </div>
             </div>
           </div>
 
-          <div className='mt-12 grid gap-3 sm:grid-cols-3'>
-            <div className='rounded-lg border border-white/70 bg-white/70 p-4 shadow-sm'>
-              <CalendarDays className='mb-4 size-5 text-cyan-700' aria-hidden='true' />
-              <p className='text-2xl font-semibold text-slate-950'>24</p>
-              <p className='text-sm text-slate-600'>visitas hoy</p>
-            </div>
-            <div className='rounded-lg border border-white/70 bg-white/70 p-4 shadow-sm'>
-              <Clock3 className='mb-4 size-5 text-blue-700' aria-hidden='true' />
-              <p className='text-2xl font-semibold text-slate-950'>08:30</p>
-              <p className='text-sm text-slate-600'>primer bloque</p>
-            </div>
-            <div className='rounded-lg border border-white/70 bg-white/70 p-4 shadow-sm'>
-              <Activity className='mb-4 size-5 text-emerald-700' aria-hidden='true' />
-              <p className='text-2xl font-semibold text-slate-950'>RBAC</p>
-              <p className='text-sm text-slate-600'>mínimo privilegio</p>
-            </div>
-          </div>
+          <p className='relative z-10 text-xs font-medium uppercase tracking-[0.18em] text-[#D9D9D9]/70'>
+            Plataforma de atención primaria domiciliaria
+          </p>
         </section>
 
-        <section className='flex items-center justify-center p-6 sm:p-8 lg:p-12'>
-          <div className='w-full max-w-md space-y-8'>
-            <div className='space-y-3'>
-              <p className='text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700'>Inicio de sesión</p>
-              <h2 className='m-0 text-3xl font-semibold leading-tight text-slate-950'>Entra a tu cuenta</h2>
-              <p className='text-base leading-7 text-slate-600'>
-                Selecciona un rol mock para probar el acceso sin depender de Keycloak.
+        <section className='relative flex items-center justify-center bg-white px-5 py-10 sm:px-10 lg:px-12 xl:px-20'>
+          <div className='absolute inset-x-0 top-0 h-1.5 bg-[#3C6E71] lg:hidden' aria-hidden='true' />
+          <div className='w-full max-w-[520px]'>
+            <div className='mb-10 flex items-center gap-3 lg:hidden'>
+              <span className='grid size-11 place-items-center rounded-2xl bg-[#284B63] text-white'>
+                <HeartPulse className='size-6' aria-hidden='true' />
+              </span>
+              <div>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.22em] text-[#3C6E71]'>Red asistencial</p>
+                <p className='font-semibold text-[#284B63]'>Salud en Casa</p>
+              </div>
+            </div>
+
+            <div className='mb-8 space-y-3'>
+              <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Acceso a plataforma</p>
+              <h2 className='m-0 text-4xl font-semibold leading-tight tracking-[-0.035em] text-[#284B63]'>
+                Bienvenido de vuelta
+              </h2>
+              <p className='max-w-md text-base leading-7 text-[#353535]/70'>
+                Selecciona tu perfil de acceso para continuar al panel de gestión.
               </p>
             </div>
 
             {profile ? (
-              <div className='space-y-6'>
-                <div className='border-l-4 border-emerald-600 bg-emerald-50 px-5 py-4'>
-                  <div className='mb-3 flex items-center gap-2 text-sm font-medium text-emerald-800'>
-                    <CheckCircle2 className='size-4' aria-hidden='true' />
-                    Sesión iniciada como
+              <div className='space-y-5'>
+                <div className='rounded-3xl border border-[#D9D9D9] bg-[#D9D9D9]/35 p-6'>
+                  <div className='mb-5 flex items-center gap-3'>
+                    <span className='grid size-10 place-items-center rounded-full bg-[#3C6E71] text-white'>
+                      <CheckCircle2 className='size-5' aria-hidden='true' />
+                    </span>
+                    <div>
+                      <p className='text-xs font-bold uppercase tracking-[0.16em] text-[#3C6E71]'>Sesión activa</p>
+                      <p className='font-semibold text-[#284B63]'>{profile.rol}</p>
+                    </div>
                   </div>
-                  <p className='text-xl font-semibold text-slate-950'>
-                    {profile.nombres} {profile.apellidos}
-                  </p>
-                  <p className='mt-1 text-slate-600'>{profile.email}</p>
-                  <p className='text-slate-600'>Rol: {profile.rol}</p>
+                  <p className='text-xl font-semibold text-[#353535]'>{profile.nombres} {profile.apellidos}</p>
+                  <p className='mt-1 text-sm text-[#353535]/65'>{profile.email}</p>
                 </div>
 
-                <div className='flex flex-col gap-3 sm:flex-row'>
-                  <Button className='h-10 grow cursor-pointer bg-emerald-700 text-white hover:bg-emerald-800' asChild>
-                    <a href='/dashboard'>Ir al panel</a>
-                  </Button>
-                  <Button
-                    variant='outline'
-                    className='h-10 grow cursor-pointer border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-                    type='button'
-                    onClick={handleLogout}
-                  >
-                    Cerrar sesión
-                  </Button>
-                </div>
+                <Button className='h-12 w-full rounded-xl bg-[#284B63] text-base text-white hover:bg-[#353535]' asChild>
+                  <a href='/dashboard'>Ir al panel <ArrowRight className='size-4' /></a>
+                </Button>
+                <Button variant='outline' className='h-11 w-full border-[#D9D9D9] text-[#353535] hover:bg-[#D9D9D9]/40' onClick={handleLogout}>
+                  Cambiar perfil
+                </Button>
               </div>
             ) : (
-              <div className='space-y-5'>
-                {error ? (
-                  <p className='rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{error}</p>
-                ) : null}
-
-                <LoginForm onAuthenticated={loadSession} />
-
-                {isLoadingSession ? (
-                  <p className='text-center text-sm text-slate-500'>Revisando sesión mock...</p>
-                ) : null}
-
-                <p className='text-center text-sm text-slate-500'>
-                  El backend valida el rol recibido y aplica mínimo privilegio por endpoint.
-                </p>
-              </div>
+              <LoginForm onAuthenticated={loadSession} />
             )}
+
+            <div className='mt-8 flex items-center gap-3 text-xs leading-5 text-[#353535]/55'>
+              <ShieldCheck className='size-4 shrink-0 text-[#3C6E71]' aria-hidden='true' />
+              <p>Acceso protegido con permisos definidos según cada perfil.</p>
+            </div>
           </div>
         </section>
       </div>

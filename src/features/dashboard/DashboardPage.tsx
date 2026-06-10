@@ -1,194 +1,147 @@
 import {
-  Activity,
+  ArrowUpRight,
+  BriefcaseMedical,
+  CalendarCheck2,
   ClipboardList,
   FileText,
-  LogOut,
   MapPin,
-  Shield,
+  ShieldCheck,
   Stethoscope,
   UserCog,
   Users,
 } from 'lucide-react'
 
-import { getMockSession, logoutMock } from '@/features/auth/mockAuth'
+import { getMockSession } from '@/features/auth/mockAuth'
 
 type NavCard = {
   title: string
   description: string
   href: string
   icon: React.ReactNode
-  color: string
+  emphasis?: boolean
   roles: string[]
 }
 
 const cards: NavCard[] = [
-  {
-    title: 'Pacientes',
-    description: 'Consulta y gestión de pacientes del sistema.',
-    href: '/patients',
-    icon: <Users className='size-5' />,
-    color: 'bg-blue-100 text-blue-700',
-    roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'],
-  },
-  {
-    title: 'Registrar paciente',
-    description: 'Formulario de ingreso de nuevo paciente.',
-    href: '/patients/new',
-    icon: <ClipboardList className='size-5' />,
-    color: 'bg-blue-100 text-blue-700',
-    roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'],
-  },
-  {
-    title: 'Usuarios',
-    description: 'Administración de usuarios y perfiles del sistema.',
-    href: '/users',
-    icon: <UserCog className='size-5' />,
-    color: 'bg-red-100 text-red-700',
-    roles: ['ADMIN', 'SUPERVISOR'],
-  },
-  {
-    title: 'Crear usuario',
-    description: 'Registro de nuevo usuario con rol asignado.',
-    href: '/users/new',
-    icon: <UserCog className='size-5' />,
-    color: 'bg-red-100 text-red-700',
-    roles: ['ADMIN'],
-  },
-  {
-    title: 'Profesionales',
-    description: 'CRUD de profesionales de salud, especialidades y asignaciones.',
-    href: '/professionals',
-    icon: <Stethoscope className='size-5' />,
-    color: 'bg-emerald-100 text-emerald-700',
-    roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'],
-  },
-  {
-    title: 'Zonas',
-    description: 'Gestión de zonas de cobertura geográfica.',
-    href: '/zones',
-    icon: <MapPin className='size-5' />,
-    color: 'bg-amber-100 text-amber-700',
-    roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'],
-  },
-  {
-    title: 'Crear zona',
-    description: 'Registro de nueva zona de cobertura.',
-    href: '/zones/new',
-    icon: <MapPin className='size-5' />,
-    color: 'bg-amber-100 text-amber-700',
-    roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'],
-  },
-  {
-    title: 'Auditoría',
-    description: 'Registro de eventos y trazabilidad del sistema.',
-    href: '/audit',
-    icon: <FileText className='size-5' />,
-    color: 'bg-purple-100 text-purple-700',
-    roles: ['ADMIN', 'SUPERVISOR'],
-  },
+  { title: 'Pacientes', description: 'Consulta fichas y datos de atención.', href: '/patients', icon: <Users className='size-5' />, emphasis: true, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { title: 'Registrar paciente', description: 'Incorpora un nuevo paciente.', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
+  { title: 'Profesionales', description: 'Gestiona equipos y asignaciones.', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { title: 'Zonas', description: 'Administra áreas de cobertura.', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { title: 'Usuarios', description: 'Administra perfiles del sistema.', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
+  { title: 'Crear usuario', description: 'Registra un usuario y su rol.', href: '/users/new', icon: <UserCog className='size-5' />, roles: ['ADMIN'] },
+  { title: 'Crear zona', description: 'Añade una zona de cobertura.', href: '/zones/new', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
+  { title: 'Auditoría', description: 'Revisa eventos y trazabilidad.', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 const DashboardPage = () => {
   const session = getMockSession()
-
-  const handleLogout = () => {
-    logoutMock()
-    window.location.href = '/'
-  }
-
-  const filteredCards = cards.filter(card =>
-    session ? card.roles.includes(session.role) : false,
-  )
+  const filteredCards = cards.filter(card => session && card.roles.includes(session.role))
 
   return (
-    <main className='min-h-screen bg-slate-50'>
-      {/* top bar */}
-      <header className='border-b border-slate-200 bg-white'>
-        <div className='mx-auto flex max-w-7xl items-center justify-between px-6 py-4'>
-          <div className='flex items-center gap-3'>
-            <div className='flex items-center gap-2 rounded-lg bg-emerald-100 px-3 py-1.5'>
-              <Activity className='size-4 text-emerald-700' />
-              <span className='text-sm font-semibold text-emerald-800'>
-                Atención Domiciliaria
-              </span>
-            </div>
-          </div>
-
-          {session && (
-            <div className='flex items-center gap-4'>
-              <div className='text-right'>
-                <p className='text-sm font-medium text-slate-900'>
-                  {session.label}
-                </p>
-                <p className='text-xs text-slate-500'>{session.role}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className='inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
-              >
-                <LogOut className='size-4' />
-                Salir
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* content */}
-      <section className='mx-auto max-w-7xl px-6 py-8'>
-        <div className='mb-8'>
-          <h1 className='text-3xl font-semibold text-slate-900'>
-            Panel de control
-          </h1>
-          <p className='mt-2 text-sm text-slate-600'>
-            Accede a los módulos del sistema según tu rol asignado.
-          </p>
-        </div>
-
-        {/* RBAC info */}
-        <div className='mb-8 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4'>
-          <Shield className='mt-0.5 size-5 shrink-0 text-amber-600' />
+    <main className='min-h-screen bg-[#182F3F] px-4 py-5 sm:px-6 sm:py-7 xl:px-10 xl:py-9'>
+      <section className='mx-auto w-full max-w-[1400px]'>
+        <header className='mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between'>
           <div>
-            <p className='text-sm font-semibold text-amber-900'>
-              Principio del mínimo privilegio activo
-            </p>
-            <p className='text-sm text-amber-800'>
-              Solo ves los módulos que tu rol tiene permitidos. Ciertas acciones
-              como crear o eliminar pueden requerir permisos adicionales dentro
-              de cada pantalla.
+            <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Panel operativo</p>
+            <h1 className='m-0 mt-2 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl'>Hola, {session?.label}</h1>
+            <p className='mt-3 max-w-2xl text-sm font-medium leading-6 text-[#D9D9D9] sm:text-base'>
+              Revisa el estado general y accede a los módulos disponibles para tu perfil.
             </p>
           </div>
-        </div>
+          <div className='inline-flex w-fit items-center gap-2 rounded-full border border-[#3C6E71] bg-[#203C50] px-4 py-2 text-xs font-bold text-white shadow-sm'>
+            <span className='size-2 rounded-full bg-[#3C6E71]' />
+            Sistema operativo
+          </div>
+        </header>
 
-        {/* cards grid */}
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-          {filteredCards.map(card => (
-            <a
-              key={card.href}
-              href={card.href}
-              className='group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md'
-            >
-              <span
-                className={`inline-flex rounded-lg p-2.5 ${card.color}`}
-              >
-                {card.icon}
+        <section className='mb-6 grid gap-4 md:grid-cols-3'>
+          <article className='relative overflow-hidden rounded-[24px] border border-[#284B63] bg-[#284B63] p-6 text-white shadow-lg shadow-[#284B63]/15 md:col-span-2'>
+            <div className='absolute -right-14 -top-20 size-56 rounded-full border-[38px] border-[#3C6E71]/50' aria-hidden='true' />
+            <div className='relative z-10 flex h-full min-h-44 flex-col justify-between gap-8 sm:flex-row sm:items-end'>
+              <div className='max-w-lg'>
+                <span className='mb-5 grid size-11 place-items-center rounded-2xl bg-white/10'>
+                  <BriefcaseMedical className='size-6' aria-hidden='true' />
+                </span>
+                <p className='text-sm font-semibold text-white'>Gestión centralizada</p>
+                <h2 className='m-0 mt-2 text-2xl font-semibold leading-tight tracking-[-0.025em] text-white sm:text-3xl'>
+                  Todo lo necesario para coordinar la atención domiciliaria.
+                </h2>
+              </div>
+              <a href='/patients' className='inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#284B63] transition hover:bg-[#D9D9D9]'>
+                Ver pacientes <ArrowUpRight className='size-4' />
+              </a>
+            </div>
+          </article>
+
+          <article className='flex min-h-44 flex-col justify-between rounded-[24px] border border-[#3C6E71] bg-[#203C50] p-6 text-white shadow-md shadow-black/15'>
+            <div className='flex items-center justify-between'>
+              <span className='grid size-11 place-items-center rounded-2xl bg-[#3C6E71] text-white'>
+                <ShieldCheck className='size-6' aria-hidden='true' />
               </span>
-              <h2 className='mt-4 text-base font-semibold text-slate-900 group-hover:text-emerald-700'>
-                {card.title}
-              </h2>
-              <p className='mt-1 text-sm leading-5 text-slate-500'>
-                {card.description}
-              </p>
-            </a>
-          ))}
-        </div>
+              <span className='rounded-full bg-[#3C6E71] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white'>Activo</span>
+            </div>
+            <div>
+              <p className='text-3xl font-semibold tracking-tight'>{filteredCards.length}</p>
+              <p className='mt-1 text-sm font-medium text-[#D9D9D9]'>módulos habilitados para tu rol</p>
+            </div>
+          </article>
+        </section>
 
-        {filteredCards.length === 0 && (
-          <div className='rounded-xl border border-slate-200 bg-white px-6 py-12 text-center'>
-            <Shield className='mx-auto mb-3 size-10 text-slate-300' />
-            <p className='text-slate-500'>No hay módulos disponibles para tu rol.</p>
+        <section className='mb-8 grid gap-4 sm:grid-cols-3'>
+          {[
+            { label: 'Atenciones del día', value: '24', icon: CalendarCheck2 },
+            { label: 'Equipos disponibles', value: '08', icon: Stethoscope },
+            { label: 'Zonas operativas', value: '06', icon: MapPin },
+          ].map(metric => {
+            const Icon = metric.icon
+            return (
+              <article key={metric.label} className='flex items-center gap-4 rounded-2xl border border-[#3C6E71]/50 bg-[#203C50] p-5 shadow-sm transition hover:border-[#3C6E71] hover:bg-[#284B63] hover:shadow-md'>
+                <span className='grid size-11 place-items-center rounded-xl bg-[#3C6E71] text-white'>
+                  <Icon className='size-5' aria-hidden='true' />
+                </span>
+                <div>
+                  <p className='text-2xl font-semibold tracking-tight text-white'>{metric.value}</p>
+                  <p className='text-xs font-semibold text-[#D9D9D9]'>{metric.label}</p>
+                </div>
+              </article>
+            )
+          })}
+        </section>
+
+        <section>
+          <div className='mb-4 flex items-end justify-between gap-4'>
+            <div>
+              <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>Accesos rápidos</p>
+              <h2 className='m-0 mt-1 text-2xl font-semibold tracking-[-0.025em] text-white'>Módulos disponibles</h2>
+            </div>
+            <p className='hidden text-xs font-semibold text-[#D9D9D9] sm:block'>Permisos según perfil {session?.role}</p>
           </div>
-        )}
+
+          <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+            {filteredCards.map(card => (
+              <a
+                key={card.href}
+                href={card.href}
+                className={`group flex min-h-44 flex-col justify-between rounded-[22px] border p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                  card.emphasis
+                    ? 'border-[#3C6E71] bg-[#3C6E71] text-white shadow-md shadow-[#3C6E71]/15'
+                    : 'border-[#3C6E71]/45 bg-[#203C50] text-white shadow-sm hover:border-[#3C6E71] hover:bg-[#284B63]'
+                }`}
+              >
+                <div className='flex items-start justify-between'>
+                  <span className={`grid size-11 place-items-center rounded-xl ${card.emphasis ? 'bg-white/20 text-white' : 'bg-[#3C6E71] text-white'}`}>
+                    {card.icon}
+                  </span>
+                  <ArrowUpRight className={`size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ${card.emphasis ? 'text-white' : 'text-[#3C6E71]'}`} />
+                </div>
+                <div>
+                  <h3 className='text-base font-semibold text-white'>{card.title}</h3>
+                  <p className={`mt-1 text-xs font-medium leading-5 ${card.emphasis ? 'text-white' : 'text-[#D9D9D9]'}`}>{card.description}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
       </section>
     </main>
   )

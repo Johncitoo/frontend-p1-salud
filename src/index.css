@@ -22,7 +22,7 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -35,39 +35,102 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
 body {
   margin: 0;
+  background: #fff;
+}
+
+.app-dark {
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(60, 110, 113, 0.2), transparent 28rem),
+    #182f3f;
+}
+
+.app-dark main,
+.app-dark .bg-slate-50 {
+  background-color: transparent !important;
+}
+
+.app-dark .bg-white {
+  background-color: #203c50 !important;
+}
+
+.app-dark .bg-slate-100 {
+  background-color: #284b63 !important;
+}
+
+.app-dark .bg-slate-200 {
+  background-color: #355f62 !important;
+}
+
+.app-dark .bg-emerald-50,
+.app-dark .bg-emerald-100,
+.app-dark .bg-blue-50,
+.app-dark .bg-blue-100 {
+  background-color: rgba(60, 110, 113, 0.28) !important;
+}
+
+.app-dark .text-slate-900,
+.app-dark .text-slate-800,
+.app-dark .text-slate-700 {
+  color: #ffffff !important;
+}
+
+.app-dark .text-slate-600,
+.app-dark .text-slate-500,
+.app-dark .text-slate-400 {
+  color: #d9d9d9 !important;
+}
+
+.app-dark .text-emerald-800,
+.app-dark .text-blue-700,
+.app-dark [class~="text-[#284B63]"] {
+  color: #ffffff !important;
+}
+
+.app-dark [class~="text-[#3C6E71]"] {
+  color: #9cbfc1 !important;
+}
+
+.app-dark .border-slate-100,
+.app-dark .border-slate-200,
+.app-dark .border-slate-300 {
+  border-color: rgba(156, 191, 193, 0.38) !important;
+}
+
+.app-dark .shadow-sm,
+.app-dark .shadow-md {
+  --tw-shadow-color: rgba(0, 0, 0, 0.22);
+}
+
+.app-dark input,
+.app-dark select,
+.app-dark textarea {
+  border-color: rgba(156, 191, 193, 0.45);
+  background-color: #182f3f;
+  color: #ffffff;
+}
+
+.app-dark input::placeholder,
+.app-dark textarea::placeholder {
+  color: #9cbfc1;
+}
+
+.app-dark code {
+  background: rgba(60, 110, 113, 0.28);
+  color: #ffffff;
+}
+
+.app-dark tbody tr:hover {
+  background-color: rgba(60, 110, 113, 0.2) !important;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100%;
+  max-width: none;
+  margin: 0;
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
   box-sizing: border-box;
 }
 

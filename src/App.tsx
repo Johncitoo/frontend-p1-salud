@@ -16,7 +16,7 @@ function App() {
   const session = getMockSession()
 
   // login sin sidebar
-  if (pathname === '/') {
+  if (pathname === '/' || pathname === '/auth/login') {
     if (session) {
       window.location.href = '/dashboard'
       return null

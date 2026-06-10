@@ -1,7 +1,5 @@
-'use client'
-
 import { useState } from 'react'
-import { LogIn } from 'lucide-react'
+import { ArrowRight, BriefcaseMedical, ClipboardCheck, Shield, UserRoundCog } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { loginWithMockRole, mockUsers, type MockRole } from '@/features/auth/mockAuth'
@@ -10,14 +8,20 @@ type LoginFormProps = {
   onAuthenticated: () => void
 }
 
+const roleIcons = {
+  COORDINADOR: ClipboardCheck,
+  PROFESIONAL: BriefcaseMedical,
+  SUPERVISOR: Shield,
+  ADMIN: UserRoundCog,
+}
+
 const LoginForm = ({ onAuthenticated }: LoginFormProps) => {
   const [selectedRole, setSelectedRole] = useState<MockRole>('COORDINADOR')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleLogin = async () => {
+  const handleLogin = () => {
     if (isSubmitting) return
-
     setError(null)
     setIsSubmitting(true)
 
@@ -25,45 +29,57 @@ const LoginForm = ({ onAuthenticated }: LoginFormProps) => {
       loginWithMockRole(selectedRole)
       onAuthenticated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No fue posible iniciar sesión mock')
+      setError(err instanceof Error ? err.message : 'No fue posible iniciar sesión')
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className='space-y-4'>
-      <div className='grid gap-2'>
-        {mockUsers.map(user => (
-          <button
-            key={user.role}
-            type='button'
-            onClick={() => setSelectedRole(user.role)}
-            className={`rounded-lg border px-4 py-3 text-left transition ${
-              selectedRole === user.role
-                ? 'border-emerald-600 bg-emerald-50 shadow-sm'
-                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            <span className='flex items-center justify-between gap-3'>
-              <span className='font-semibold text-slate-950'>{user.label}</span>
-              <span className='rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600'>{user.role}</span>
-            </span>
-            <span className='mt-1 block text-sm leading-5 text-slate-600'>{user.description}</span>
-          </button>
-        ))}
-      </div>
+    <div className='space-y-5'>
+      <fieldset>
+        <legend className='mb-3 text-sm font-semibold text-[#353535]'>Selecciona un perfil</legend>
+        <div className='grid gap-3 sm:grid-cols-2'>
+          {mockUsers.map(user => {
+            const Icon = roleIcons[user.role]
+            const selected = selectedRole === user.role
+
+            return (
+              <button
+                key={user.role}
+                type='button'
+                aria-pressed={selected}
+                onClick={() => setSelectedRole(user.role)}
+                className={`group min-h-28 rounded-2xl border p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C6E71] focus-visible:ring-offset-2 ${
+                  selected
+                    ? 'border-[#3C6E71] bg-[#3C6E71] text-white shadow-lg shadow-[#3C6E71]/20'
+                    : 'border-[#D9D9D9] bg-white text-[#353535] hover:-translate-y-0.5 hover:border-[#3C6E71] hover:shadow-md'
+                }`}
+              >
+                <span className='mb-4 flex items-center justify-between'>
+                  <span className={`grid size-9 place-items-center rounded-xl ${selected ? 'bg-white/15 text-white' : 'bg-[#D9D9D9]/45 text-[#284B63]'}`}>
+                    <Icon className='size-4.5' aria-hidden='true' />
+                  </span>
+                  <span className={`size-2.5 rounded-full border-2 ${selected ? 'border-white bg-white' : 'border-[#D9D9D9] bg-white'}`} />
+                </span>
+                <span className={`block text-sm font-semibold ${selected ? 'text-white' : 'text-[#284B63]'}`}>{user.label}</span>
+                <span className={`mt-1 block text-xs leading-5 ${selected ? 'text-white/75' : 'text-[#353535]/60'}`}>{user.description}</span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
 
       <Button
-        className='h-11 w-full cursor-pointer bg-emerald-700 text-base text-white shadow-sm shadow-emerald-900/10 hover:bg-emerald-800'
+        className='h-[52px] w-full rounded-xl bg-[#284B63] px-5 text-base font-semibold text-white shadow-lg shadow-[#284B63]/15 hover:bg-[#353535]'
         type='button'
         aria-busy={isSubmitting}
         onClick={handleLogin}
       >
-        <LogIn className='size-4' aria-hidden='true' />
-        {isSubmitting ? 'Entrando...' : 'Ingresar con usuario mock'}
+        {isSubmitting ? 'Ingresando...' : 'Continuar al panel'}
+        <ArrowRight className='size-4' aria-hidden='true' />
       </Button>
 
-      {error ? <p className='text-sm text-destructive'>{error}</p> : null}
+      {error ? <p className='rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{error}</p> : null}
     </div>
   )
 }
