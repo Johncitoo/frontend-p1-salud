@@ -3,6 +3,7 @@ import { FormEvent, useMemo, useState } from 'react'
 import { ArrowLeft, Save, UserPlus } from 'lucide-react'
 
 import { apiPost } from '@/lib/api'
+import { formatearRutEnVivo } from '@/lib/rut'
 import {
   buildCreatePatientPayload,
   emptyPatientForm,
@@ -25,9 +26,20 @@ const PatientRegistrationPage = () => {
   const [submitError, setSubmitError] = useState('')
   const [createdPatient, setCreatedPatient] = useState<CreatedPatient | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [touched, setTouched] = useState<Set<string>>(new Set())
 
   const errors = useMemo(() => validatePatientForm(values), [values])
-  const hasErrors = Object.keys(errors).length > 0
+  const visibleErrors = useMemo(() => {
+    const result: Record<string, string> = {}
+    for (const [key, msg] of Object.entries(errors)) {
+      if (touched.has(key)) result[key] = msg
+    }
+    return result
+  }, [errors, touched])
+
+  const touchField = (field: keyof PatientFormValues) => {
+    setTouched(prev => new Set(prev).add(field))
+  }
 
   const updateField = (field: keyof PatientFormValues, value: string) => {
     setValues(currentValues => ({
@@ -40,6 +52,8 @@ const PatientRegistrationPage = () => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setTouched(new Set(['rut', 'nombres', 'apellidos']))
+
     const validationErrors = validatePatientForm(values)
 
     if (Object.keys(validationErrors).length > 0) {
@@ -97,11 +111,12 @@ const PatientRegistrationPage = () => {
               RUT <span className='text-red-600'>*</span>
               <input
                 value={values.rut}
-                onChange={event => updateField('rut', event.target.value)}
+                onChange={event => updateField('rut', formatearRutEnVivo(event.target.value))}
+                onBlur={() => touchField('rut')}
                 placeholder='12.345.678-9'
                 className={fieldClassName}
               />
-              {errors.rut && <span className='mt-1 block text-xs text-red-600'>{errors.rut}</span>}
+              {visibleErrors.rut && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.rut}</span>}
             </label>
 
             <label className={labelClassName}>
@@ -119,10 +134,11 @@ const PatientRegistrationPage = () => {
               <input
                 value={values.nombres}
                 onChange={event => updateField('nombres', event.target.value)}
+                onBlur={() => touchField('nombres')}
                 placeholder='María Elena'
                 className={fieldClassName}
               />
-              {errors.nombres && <span className='mt-1 block text-xs text-red-600'>{errors.nombres}</span>}
+              {visibleErrors.nombres && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.nombres}</span>}
             </label>
 
             <label className={labelClassName}>
@@ -130,10 +146,11 @@ const PatientRegistrationPage = () => {
               <input
                 value={values.apellidos}
                 onChange={event => updateField('apellidos', event.target.value)}
+                onBlur={() => touchField('apellidos')}
                 placeholder='Rojas Fuentes'
                 className={fieldClassName}
               />
-              {errors.apellidos && <span className='mt-1 block text-xs text-red-600'>{errors.apellidos}</span>}
+              {visibleErrors.apellidos && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.apellidos}</span>}
             </label>
 
             <label className={labelClassName}>
@@ -167,10 +184,11 @@ const PatientRegistrationPage = () => {
                 type='email'
                 value={values.email}
                 onChange={event => updateField('email', event.target.value)}
+                onBlur={() => touchField('email')}
                 placeholder='paciente@correo.cl'
                 className={fieldClassName}
               />
-              {errors.email && <span className='mt-1 block text-xs text-red-600'>{errors.email}</span>}
+              {visibleErrors.email && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.email}</span>}
             </label>
 
             <label className={labelClassName}>
@@ -205,7 +223,7 @@ const PatientRegistrationPage = () => {
             </a>
             <button
               type='submit'
-              disabled={isSubmitting || hasErrors}
+              disabled={isSubmitting}
               className='inline-flex items-center justify-center gap-2 rounded-lg bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63] disabled:cursor-not-allowed disabled:bg-slate-400'
             >
               <Save className='size-4' />

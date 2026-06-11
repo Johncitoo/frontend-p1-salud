@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 
-import { ArrowLeft, Save, ShieldAlert, UserPlus } from 'lucide-react'
+import { ArrowLeft, Save, UserPlus } from 'lucide-react'
 
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
+import { roleLabel } from '@/lib/roleLabel'
+import { formatearRutEnVivo } from '@/lib/rut'
 import { buildUserPayload, createEmptyUserForm, validateUserForm, type UserFormValues, type UserPayload } from './userForm'
 import type { RoleOption, UserRow } from './types'
 
@@ -16,7 +18,6 @@ const fieldClassName =
 const labelClassName = 'text-sm font-medium text-slate-700'
 
 const mapUserToForm = (user: UserRow): UserFormValues => ({
-  identityUserId: user.identityUserId ?? '',
   rolId: user.rolId,
   rut: user.rut,
   nombres: user.nombres,
@@ -34,9 +35,16 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [touched, setTouched] = useState<Set<string>>(new Set())
 
   const errors = useMemo(() => validateUserForm(values), [values])
-  const hasErrors = Object.keys(errors).length > 0
+  const visibleErrors = useMemo(() => {
+    const result: Record<string, string> = {}
+    for (const [key, msg] of Object.entries(errors)) {
+      if (touched.has(key)) result[key] = msg
+    }
+    return result
+  }, [errors, touched])
 
   useEffect(() => {
     let isMounted = true
@@ -68,8 +76,15 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
     setSuccessMessage('')
   }
 
+  const touchField = (field: keyof UserFormValues) => {
+    setTouched(prev => new Set(prev).add(field))
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    // Marcar todos los campos como tocados al hacer submit
+    setTouched(new Set(['rolId', 'rut', 'nombres', 'apellidos', 'email']))
 
     if (Object.keys(validateUserForm(values)).length > 0) {
       setSubmitError('Completa los campos obligatorios antes de guardar el usuario.')
@@ -119,20 +134,11 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
                 {isEditing ? 'Editar usuario' : 'Registro de usuarios'}
               </h1>
               <p className='mt-2 text-sm text-slate-600'>
-                CRUD local de usuarios. La contraseña sigue siendo responsabilidad del Proyecto 12.
+                Registra el perfil local del usuario. Al iniciar sesión por primera vez, el sistema vinculará automáticamente su identidad por email.
               </p>
             </div>
           </div>
         </header>
-
-        <div className='mb-6 flex gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
-          <ShieldAlert className='mt-0.5 size-4 shrink-0' />
-          <p className='m-0'>
-            Este formulario no guarda contraseñas. Puedes registrar email y perfil local, pero las credenciales reales
-            deben existir en el sistema centralizado. Si dejas el Identity user ID vacio, se vinculara automaticamente
-            por email cuando la persona inicie sesion por primera vez.
-          </p>
-        </div>
 
         <form onSubmit={handleSubmit} className='rounded-xl border border-slate-200 bg-white p-6 shadow-sm'>
           {isLoading ? (
@@ -141,43 +147,33 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
             <>
               <div className='grid gap-5 md:grid-cols-2'>
                 <label className={labelClassName}>
-                  Identity user ID <span className='text-red-600'>*</span>
-                  <input
-                    value={values.identityUserId}
-                    onChange={event => updateField('identityUserId', event.target.value)}
-                    className={fieldClassName}
-                  />
-                  {errors.identityUserId && (
-                    <span className='mt-1 block text-xs text-red-600'>{errors.identityUserId}</span>
-                  )}
-                </label>
-
-                <label className={labelClassName}>
                   Rol <span className='text-red-600'>*</span>
                   <select
                     value={values.rolId}
                     onChange={event => updateField('rolId', event.target.value)}
+                    onBlur={() => touchField('rolId')}
                     className={fieldClassName}
                   >
                     <option value=''>Seleccionar rol</option>
                     {roles.map(role => (
                       <option key={role.id} value={role.id}>
-                        {role.nombre}
+                        {roleLabel(role.nombre)}
                       </option>
                     ))}
                   </select>
-                  {errors.rolId && <span className='mt-1 block text-xs text-red-600'>{errors.rolId}</span>}
+                  {visibleErrors.rolId && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.rolId}</span>}
                 </label>
 
                 <label className={labelClassName}>
                   RUT <span className='text-red-600'>*</span>
                   <input
                     value={values.rut}
-                    onChange={event => updateField('rut', event.target.value)}
+                    onChange={event => updateField('rut', formatearRutEnVivo(event.target.value))}
+                    onBlur={() => touchField('rut')}
                     placeholder='12.345.678-9'
                     className={fieldClassName}
                   />
-                  {errors.rut && <span className='mt-1 block text-xs text-red-600'>{errors.rut}</span>}
+                  {visibleErrors.rut && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.rut}</span>}
                 </label>
 
                 <label className={labelClassName}>
@@ -186,10 +182,11 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
                     type='email'
                     value={values.email}
                     onChange={event => updateField('email', event.target.value)}
+                    onBlur={() => touchField('email')}
                     placeholder='usuario@correo.cl'
                     className={fieldClassName}
                   />
-                  {errors.email && <span className='mt-1 block text-xs text-red-600'>{errors.email}</span>}
+                  {visibleErrors.email && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.email}</span>}
                 </label>
 
                 <label className={labelClassName}>
@@ -197,10 +194,11 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
                   <input
                     value={values.nombres}
                     onChange={event => updateField('nombres', event.target.value)}
+                    onBlur={() => touchField('nombres')}
                     placeholder='María Elena'
                     className={fieldClassName}
                   />
-                  {errors.nombres && <span className='mt-1 block text-xs text-red-600'>{errors.nombres}</span>}
+                  {visibleErrors.nombres && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.nombres}</span>}
                 </label>
 
                 <label className={labelClassName}>
@@ -208,10 +206,11 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
                   <input
                     value={values.apellidos}
                     onChange={event => updateField('apellidos', event.target.value)}
+                    onBlur={() => touchField('apellidos')}
                     placeholder='Rojas Fuentes'
                     className={fieldClassName}
                   />
-                  {errors.apellidos && <span className='mt-1 block text-xs text-red-600'>{errors.apellidos}</span>}
+                  {visibleErrors.apellidos && <span className='mt-1 block text-xs text-red-600'>{visibleErrors.apellidos}</span>}
                 </label>
 
                 <label className={labelClassName}>
@@ -256,7 +255,7 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
                 </a>
                 <button
                   type='submit'
-                  disabled={isSubmitting || hasErrors}
+                  disabled={isSubmitting}
                   className='inline-flex items-center justify-center gap-2 rounded-lg bg-[#3C6E71] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#284B63] disabled:cursor-not-allowed disabled:bg-slate-400'
                 >
                   <Save className='size-4' />

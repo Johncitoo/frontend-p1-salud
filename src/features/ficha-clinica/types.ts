@@ -24,6 +24,23 @@ export type PlantillaFichaRow = {
   campos?: PlantillaCampoRow[]
 }
 
+export type PatientOptionRow = {
+  id: string
+  rut: string
+  nombres: string
+  apellidos: string
+}
+
+export type VisitaOptionRow = {
+  id: string
+  pacienteId: string
+  fechaProgramada?: string | null
+  fechaRealizada?: string | null
+  estado?: string | null
+  observacion?: string | null
+  createdAt: string
+}
+
 export type PlantillaCampoRow = {
   id: string
   plantillaFichaId: string
@@ -72,7 +89,7 @@ export type MedicionClinicaRow = {
 
 // ---- Tipos de formulario ----
 
-export type DynamicFieldValue = string | number | boolean | Record<string, unknown>
+export type DynamicFieldValue = string | number | boolean | string[] | Record<string, unknown>
 
 export type FichaFormValues = {
   visitaId: string

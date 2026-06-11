@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import AppLayout from '@/components/AppLayout'
 import LoginPage from './features/auth/LoginPage'
@@ -13,6 +13,8 @@ import ProfessionalsPage from './features/professionals/ProfessionalsPage'
 import AuditPage from './features/audit/AuditPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
+import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
+import PlantillaFichaPreviewPage from './features/ficha-clinica/PlantillaFichaPreviewPage'
 import { useAuthSession } from './features/auth/AuthSessionContext'
 
 const FullPageMessage = ({
@@ -35,8 +37,41 @@ const FullPageMessage = ({
 )
 
 function App() {
-  const pathname = window.location.pathname
+  const [pathname, setPathname] = useState(window.location.pathname)
   const { status, error, logout } = useAuthSession()
+
+  useEffect(() => {
+    const handlePopState = () => setPathname(window.location.pathname)
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest('a')
+      if (!anchor) return
+      if (anchor.target || anchor.hasAttribute('download')) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return
+
+      const nextUrl = new URL(href, window.location.origin)
+      if (nextUrl.origin !== window.location.origin) return
+
+      event.preventDefault()
+      window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`)
+      setPathname(nextUrl.pathname)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    document.addEventListener('click', handleDocumentClick)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      document.removeEventListener('click', handleDocumentClick)
+    }
+  }, [])
 
   if (status === 'loading') {
     return <FullPageMessage title='Conectando con identidad' message='Estamos validando tu sesion en el Sistema de Identidad.' />
@@ -107,7 +142,12 @@ function App() {
 
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />
-    if (pathname === '/fichas-clinicas/new') return <FichaClinicaFormPage />
+    if (pathname === '/fichas-clinicas/new') return <PlantillaFichaBuilderPage />
+    if (pathname === '/fichas-clinicas/llenar') return <FichaClinicaFormPage />
+    const plantillaPreviewMatch = pathname.match(/^\/fichas-clinicas\/plantillas\/([^/]+)$/)
+    if (plantillaPreviewMatch) return <PlantillaFichaPreviewPage plantillaId={plantillaPreviewMatch[1]} />
+    const plantillaEditMatch = pathname.match(/^\/fichas-clinicas\/plantillas\/([^/]+)\/editar$/)
+    if (plantillaEditMatch) return <PlantillaFichaBuilderPage plantillaId={plantillaEditMatch[1]} />
     const fichaEditMatch = pathname.match(/^\/fichas-clinicas\/([^/]+)\/editar$/)
     if (fichaEditMatch) return <FichaClinicaFormPage fichaId={fichaEditMatch[1]} />
     const fichaViewMatch = pathname.match(/^\/fichas-clinicas\/([^/]+)$/)

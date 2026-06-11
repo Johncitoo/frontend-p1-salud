@@ -24,6 +24,15 @@ type Professional = {
   activo: boolean
 }
 
+type AvailableUser = {
+  id: string
+  rut: string
+  nombres: string
+  apellidos: string
+  email: string
+  rol: string
+}
+
 type Specialty = {
   id: string
   nombre: string
@@ -41,11 +50,17 @@ type ZoneRow = {
 type ProfessionalForm = {
   usuarioId: string
   profesion: string
+  numeroRegistro: string
+  especialidadIds: string[]
+  zonaIds: string[]
 }
 
 const emptyProfessionalForm: ProfessionalForm = {
   usuarioId: '',
   profesion: '',
+  numeroRegistro: '',
+  especialidadIds: [],
+  zonaIds: [],
 }
 
 // ---- componente ----
@@ -60,6 +75,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
   // estado general
   const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([])
   const [specialties, setSpecialties] = useState<Specialty[]>([])
   const [zones, setZones] = useState<ZoneRow[]>([])
   const [error, setError] = useState('')
@@ -93,11 +109,13 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
     Promise.all([
       apiGet<Professional[]>('/profesionales'),
+      apiGet<AvailableUser[]>('/profesionales/usuarios-disponibles'),
       apiGet<Specialty[]>('/profesionales/especialidades'),
       apiGet<ZoneRow[]>('/zonas'),
     ])
-      .then(([profs, specs, zns]) => {
+      .then(([profs, users, specs, zns]) => {
         setProfessionals(profs)
+        setAvailableUsers(users)
         setSpecialties(specs)
         setZones(zns)
 
@@ -105,7 +123,13 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
           const prof = profs.find(p => p.id === editId)
           if (prof) {
             setEditingId(prof.id)
-            setEditForm({ usuarioId: prof.usuarioId, profesion: prof.profesion })
+            setEditForm({
+              usuarioId: prof.usuarioId,
+              profesion: prof.profesion,
+              numeroRegistro: prof.numeroRegistro ?? '',
+              especialidadIds: [],
+              zonaIds: [],
+            })
           }
         }
       })
@@ -122,6 +146,18 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
     setSuccessMsg('')
   }
 
+  const toggleFormValue = (key: 'especialidadIds' | 'zonaIds', value: string) => {
+    setProfForm(current => {
+      const selected = current[key]
+      return {
+        ...current,
+        [key]: selected.includes(value)
+          ? selected.filter(currentValue => currentValue !== value)
+          : [...selected, value],
+      }
+    })
+  }
+
   // ---- CRUD profesional ----
   const handleCreateProfessional = async (e: FormEvent) => {
     e.preventDefault()
@@ -131,7 +167,13 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
     }
     clearMessages()
     try {
-      await apiPost('/profesionales', profForm)
+      await apiPost('/profesionales', {
+        usuarioId: profForm.usuarioId,
+        profesion: profForm.profesion.trim(),
+        numeroRegistro: profForm.numeroRegistro.trim() || null,
+        especialidadIds: profForm.especialidadIds,
+        zonaIds: profForm.zonaIds,
+      })
       setProfForm(emptyProfessionalForm)
       setSuccessMsg('Profesional creado correctamente.')
       loadData()
@@ -142,7 +184,13 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
   const startEditing = (prof: Professional) => {
     setEditingId(prof.id)
-    setEditForm({ usuarioId: prof.usuarioId, profesion: prof.profesion })
+    setEditForm({
+      usuarioId: prof.usuarioId,
+      profesion: prof.profesion,
+      numeroRegistro: prof.numeroRegistro ?? '',
+      especialidadIds: [],
+      zonaIds: [],
+    })
     clearMessages()
   }
 
@@ -159,7 +207,11 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
     }
     clearMessages()
     try {
-      await apiPatch(`/profesionales/${id}`, editForm)
+      await apiPatch(`/profesionales/${id}`, {
+        usuarioId: editForm.usuarioId,
+        profesion: editForm.profesion.trim(),
+        numeroRegistro: editForm.numeroRegistro.trim() || null,
+      })
       setEditingId(null)
       setEditForm(emptyProfessionalForm)
       setSuccessMsg('Profesional actualizado.')
@@ -287,32 +339,144 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
           <p className='py-10 text-center text-sm text-slate-500'>Cargando profesionales...</p>
         ) : (
           <>
-            {/* ---- crear profesional ---- */}
+            {/* ---- registrar profesional ---- */}
             {canWrite && (
               <form onSubmit={handleCreateProfessional} className='rounded-xl border border-slate-200 bg-white p-5 shadow-sm'>
                 <div className='mb-3 flex items-center gap-2'>
                   <BriefcaseMedical className='size-5 text-emerald-700' />
-                  <h2 className='text-lg font-semibold text-slate-900'>Crear profesional</h2>
+                  <h2 className='text-lg font-semibold text-slate-900'>Registrar profesional</h2>
                 </div>
-                <div className='grid gap-3 sm:grid-cols-[1fr_1fr_auto]'>
-                  <input
-                    value={profForm.usuarioId}
-                    onChange={e => setProfForm(p => ({ ...p, usuarioId: e.target.value }))}
-                    placeholder='UUID del usuario'
-                    className='rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                  />
-                  <input
-                    value={profForm.profesion}
-                    onChange={e => setProfForm(p => ({ ...p, profesion: e.target.value }))}
-                    placeholder='Profesión (ej. Enfermero/a)'
-                    className='rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                  />
+                <p className='mb-4 text-sm text-slate-600'>
+                  Selecciona un usuario local con rol PROFESIONAL y completa sus datos clinicos.
+                </p>
+
+                <div className='grid gap-4 lg:grid-cols-2'>
+                  <label className='block'>
+                    <span className='text-sm font-semibold text-slate-700'>Usuario profesional</span>
+                    <select
+                      value={profForm.usuarioId}
+                      onChange={e => setProfForm(p => ({ ...p, usuarioId: e.target.value }))}
+                      required
+                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                    >
+                      <option value=''>Selecciona un usuario</option>
+                      {availableUsers.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.nombres} {user.apellidos} - {user.email} ({user.rut})
+                        </option>
+                      ))}
+                    </select>
+                    {availableUsers.length === 0 && (
+                      <span className='mt-1 block text-xs text-amber-700'>
+                        No hay usuarios con rol PROFESIONAL disponibles. Crea el usuario primero en Usuarios.
+                      </span>
+                    )}
+                  </label>
+
+                  <label className='block'>
+                    <span className='text-sm font-semibold text-slate-700'>Profesion</span>
+                    <select
+                      value={profForm.profesion}
+                      onChange={e => setProfForm(p => ({ ...p, profesion: e.target.value }))}
+                      required
+                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                    >
+                      <option value=''>Seleccionar especialidad</option>
+                      {specialties.map(s => (
+                        <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className='block'>
+                    <span className='text-sm font-semibold text-slate-700'>Numero de registro</span>
+                    <input
+                      value={profForm.numeroRegistro}
+                      onChange={e => setProfForm(p => ({ ...p, numeroRegistro: e.target.value }))}
+                      placeholder='Opcional'
+                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                    />
+                  </label>
+
+                  <label className='block'>
+                    <span className='text-sm font-semibold text-slate-700'>Zonas de cobertura</span>
+                    <select
+                      value=''
+                      onChange={e => {
+                        if (e.target.value) toggleFormValue('zonaIds', e.target.value)
+                      }}
+                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                    >
+                      <option value=''>Agregar zona opcional</option>
+                      {zones.filter(z => z.activa && !profForm.zonaIds.includes(z.id)).map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.nombre} - {zone.comuna}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className='mt-4 grid gap-4 lg:grid-cols-2'>
+                  <div>
+                    <p className='mb-2 text-sm font-semibold text-slate-700'>Especialidades</p>
+                    <div className='flex flex-wrap gap-2'>
+                      {specialties.map(specialty => (
+                        <label
+                          key={specialty.id}
+                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                            profForm.especialidadIds.includes(specialty.id)
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                              : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type='checkbox'
+                            checked={profForm.especialidadIds.includes(specialty.id)}
+                            onChange={() => toggleFormValue('especialidadIds', specialty.id)}
+                            className='size-3.5 rounded border-slate-300 text-emerald-700'
+                          />
+                          {specialty.nombre}
+                        </label>
+                      ))}
+                      {specialties.length === 0 && (
+                        <span className='text-xs text-slate-500'>No hay especialidades creadas todavia.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className='mb-2 text-sm font-semibold text-slate-700'>Zonas seleccionadas</p>
+                    <div className='flex flex-wrap gap-2'>
+                      {profForm.zonaIds.map(zonaId => {
+                        const zone = zones.find(z => z.id === zonaId)
+                        return (
+                          <button
+                            key={zonaId}
+                            type='button'
+                            onClick={() => toggleFormValue('zonaIds', zonaId)}
+                            className='inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800'
+                          >
+                            {zone ? `${zone.nombre} - ${zone.comuna}` : zonaId}
+                            <X className='size-3' />
+                          </button>
+                        )
+                      })}
+                      {profForm.zonaIds.length === 0 && (
+                        <span className='text-xs text-slate-500'>Puedes asignarlas ahora o despues desde el boton Asignar.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className='mt-5 flex justify-end'>
                   <button
                     type='submit'
-                    className='inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800'
+                    disabled={availableUsers.length === 0}
+                    className='inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60'
                   >
                     <Plus className='size-4' />
-                    Crear
+                    Registrar profesional
                   </button>
                 </div>
               </form>
@@ -349,20 +513,30 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                         {editingId === prof.id ? (
                           <>
                             <td className='px-5 py-2'>
-                              <input
+                              <select
                                 value={editForm.profesion}
                                 onChange={e => setEditForm(f => ({ ...f, profesion: e.target.value }))}
                                 className='w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-500'
-                              />
+                              >
+                                <option value=''>Seleccionar</option>
+                                {specialties.map(s => (
+                                  <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className='px-5 py-2'>
+                              <span className='block max-w-[220px] truncate font-mono text-xs text-slate-500'>
+                                {editForm.usuarioId}
+                              </span>
                             </td>
                             <td className='px-5 py-2'>
                               <input
-                                value={editForm.usuarioId}
-                                onChange={e => setEditForm(f => ({ ...f, usuarioId: e.target.value }))}
-                                className='w-full rounded border border-slate-300 px-2 py-1 text-sm font-mono outline-none focus:border-emerald-500'
+                                value={editForm.numeroRegistro}
+                                onChange={e => setEditForm(f => ({ ...f, numeroRegistro: e.target.value }))}
+                                placeholder='Opcional'
+                                className='w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-500'
                               />
                             </td>
-                            <td className='px-5 py-2 text-slate-400'>—</td>
                             <td className='px-5 py-2'>
                               <span className='rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800'>
                                 Editando

@@ -1,5 +1,6 @@
+import { rutEstaCompleto, validarRut } from '@/lib/rut'
+
 export type UserFormValues = {
-  identityUserId: string
   rolId: string
   rut: string
   nombres: string
@@ -10,7 +11,6 @@ export type UserFormValues = {
 }
 
 export type UserPayload = {
-  identityUserId?: string
   rolId: string
   rut: string
   nombres: string
@@ -23,7 +23,6 @@ export type UserPayload = {
 export type UserFormErrors = Partial<Record<keyof UserFormValues, string>>
 
 export const createEmptyUserForm = (): UserFormValues => ({
-  identityUserId: '',
   rolId: '',
   rut: '',
   nombres: '',
@@ -39,7 +38,11 @@ export function validateUserForm(values: UserFormValues): UserFormErrors {
   const errors: UserFormErrors = {}
 
   if (!values.rolId) errors.rolId = 'El rol es obligatorio.'
-  if (!values.rut.trim()) errors.rut = 'El RUT es obligatorio.'
+  if (!values.rut.trim()) {
+    errors.rut = 'El RUT es obligatorio.'
+  } else if (rutEstaCompleto(values.rut) && !validarRut(values.rut)) {
+    errors.rut = 'El RUT no es válido (dígito verificador incorrecto).'
+  }
   if (!values.nombres.trim()) errors.nombres = 'Los nombres son obligatorios.'
   if (!values.apellidos.trim()) errors.apellidos = 'Los apellidos son obligatorios.'
   if (!values.email.trim()) errors.email = 'El correo es obligatorio.'
@@ -52,7 +55,6 @@ export function validateUserForm(values: UserFormValues): UserFormErrors {
 
 export function buildUserPayload(values: UserFormValues): UserPayload {
   return {
-    ...(values.identityUserId.trim() ? { identityUserId: values.identityUserId.trim() } : {}),
     rolId: values.rolId,
     rut: values.rut.trim(),
     nombres: values.nombres.trim(),

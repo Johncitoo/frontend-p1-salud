@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
+import { createLocalMockProfile, getMockSession } from './mockAuth'
 import {
   getKeycloakAccessRoles,
   hasKeycloakAccessRole,
@@ -23,6 +24,9 @@ type AuthSessionContextValue = {
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null)
 
+const AUTH_MODE = import.meta.env.VITE_AUTH_MODE as string
+const IS_MOCK = AUTH_MODE === 'mock'
+
 export function AuthSessionProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [profile, setProfile] = useState<CurrentUserProfile | null>(null)
@@ -36,6 +40,22 @@ export function AuthSessionProvider({ children }: { children: React.ReactNode })
       setStatus('loading')
       setError(null)
 
+      // ── Modo mock: no tocar Keycloak ──
+      if (IS_MOCK) {
+        const session = getMockSession()
+        if (!cancelled) {
+          if (session) {
+            setProfile(createLocalMockProfile(session))
+            setStatus('authenticated')
+          } else {
+            // Sin sesión mock → la landing redirige al login normalmente
+            setStatus('authenticated')
+          }
+        }
+        return
+      }
+
+      // ── Modo Keycloak real ──
       try {
         const authenticated = await initKeycloakWithTimeout(6000)
         if (cancelled) return

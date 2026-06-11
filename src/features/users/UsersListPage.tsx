@@ -4,6 +4,7 @@ import { Pencil, Search, Trash2, UserPlus } from 'lucide-react'
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiDelete, apiGet } from '@/lib/api'
+import { roleLabel } from '@/lib/roleLabel'
 import type { UserRow } from './types'
 
 const UsersListPage = () => {
@@ -126,7 +127,7 @@ const UsersListPage = () => {
                   <td className='px-4 py-3 font-medium'>{user.rut}</td>
                   <td className='px-4 py-3'>{user.nombres} {user.apellidos}</td>
                   <td className='px-4 py-3'>{user.email}</td>
-                  <td className='px-4 py-3'>{user.rol || '-'}</td>
+                  <td className='px-4 py-3'>{roleLabel(user.rol || '') || '-'}</td>
                   <td className='max-w-[260px] truncate px-4 py-3 font-mono text-xs'>{user.identityUserId || 'Pendiente'}</td>
                   <td className='px-4 py-3'>
                     <span

@@ -1,3 +1,5 @@
+import { rutEstaCompleto, validarRut } from '@/lib/rut'
+
 export type PatientSex = '' | 'FEMENINO' | 'MASCULINO' | 'OTRO' | 'NO_INFORMA'
 
 export type PatientFormValues = {
@@ -40,7 +42,11 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export function validatePatientForm(values: PatientFormValues): PatientFormErrors {
   const errors: PatientFormErrors = {}
 
-  if (!values.rut.trim()) errors.rut = 'El RUT es obligatorio.'
+  if (!values.rut.trim()) {
+    errors.rut = 'El RUT es obligatorio.'
+  } else if (rutEstaCompleto(values.rut) && !validarRut(values.rut)) {
+    errors.rut = 'El RUT no es válido (dígito verificador incorrecto).'
+  }
   if (!values.nombres.trim()) errors.nombres = 'Los nombres son obligatorios.'
   if (!values.apellidos.trim()) errors.apellidos = 'Los apellidos son obligatorios.'
 

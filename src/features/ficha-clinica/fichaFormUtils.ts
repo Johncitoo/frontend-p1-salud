@@ -60,7 +60,7 @@ export function validateDynamicFields(
 
   for (const campo of campos) {
     const value = fields[campo.codigoCampo]
-    const isEmpty = value === undefined || value === null || value === ''
+    const isEmpty = value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
 
     if (campo.obligatorio && isEmpty) {
       errors[campo.codigoCampo] = `${campo.etiqueta} es obligatorio.`
