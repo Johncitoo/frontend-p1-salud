@@ -70,8 +70,8 @@ type ProfessionalsPageProps = {
 
 const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
   const session = useCurrentUser()
-  const canWrite = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
-  const canDelete = session.rol === 'ADMIN' || session.rol === 'SUPERVISOR'
+  const canWrite = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
+  const canDelete = session.rol === 'ADMIN'
 
   // estado general
   const [professionals, setProfessionals] = useState<Professional[]>([])
@@ -109,7 +109,9 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
     Promise.all([
       apiGet<Professional[]>('/profesionales'),
-      apiGet<AvailableUser[]>('/profesionales/usuarios-disponibles'),
+      canWrite
+        ? apiGet<AvailableUser[]>('/profesionales/usuarios-disponibles')
+        : Promise.resolve([] as AvailableUser[]),
       apiGet<Specialty[]>('/profesionales/especialidades'),
       apiGet<ZoneRow[]>('/zonas'),
     ])

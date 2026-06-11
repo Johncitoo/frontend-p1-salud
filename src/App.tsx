@@ -16,6 +16,8 @@ import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
 import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
 import PlantillaFichaPreviewPage from './features/ficha-clinica/PlantillaFichaPreviewPage'
 import { useAuthSession } from './features/auth/AuthSessionContext'
+import { roleHomePath } from './lib/roleHome'
+import { canAccessPath } from './lib/permissions'
 
 const FullPageMessage = ({
   title,
@@ -38,7 +40,7 @@ const FullPageMessage = ({
 
 function App() {
   const [pathname, setPathname] = useState(window.location.pathname)
-  const { status, error, logout } = useAuthSession()
+  const { status, profile, error, logout } = useAuthSession()
 
   useEffect(() => {
     const handlePopState = () => setPathname(window.location.pathname)
@@ -114,12 +116,32 @@ function App() {
   }
 
   if (pathname === '/' || pathname === '/auth/login') {
-    window.location.href = '/dashboard'
+    window.location.href = roleHomePath(profile!.rol)
     return null
   }
 
   const getPage = () => {
+    if (!canAccessPath(profile!.rol, pathname)) {
+      return (
+        <FullPageMessage
+          title='Acceso restringido'
+          message='Tu perfil no tiene permisos para acceder a esta sección.'
+          action={
+            <a
+              href={roleHomePath(profile!.rol)}
+              className='inline-flex rounded-xl bg-[#3C6E71] px-4 py-2 text-sm font-semibold text-white'
+            >
+              Volver a tu panel
+            </a>
+          }
+        />
+      )
+    }
+
     if (pathname === '/dashboard') return <DashboardPage />
+    if (pathname === '/coordinator' || pathname === '/supervisor' || pathname === '/professional') {
+      return <DashboardPage />
+    }
 
     if (pathname === '/patients') return <PatientsListPage />
     if (pathname === '/patients/new') return <PatientRegistrationPage />

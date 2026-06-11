@@ -11,8 +11,8 @@ const ZonesListPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const session = useCurrentUser()
-  const canWriteZones = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
-  const canDeleteZones = session.rol === 'ADMIN' || session.rol === 'SUPERVISOR'
+  const canWriteZones = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
+  const canDeleteZones = session.rol === 'ADMIN'
 
   const loadZones = () => {
     setIsLoading(true)
