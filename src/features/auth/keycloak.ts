@@ -3,7 +3,7 @@ import Keycloak from 'keycloak-js'
 export const keycloak = new Keycloak({
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost',
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'sistema-centralizado',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'proyecto-test',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'app-1',
 })
 
 let initPromise: Promise<boolean> | null = null
@@ -19,7 +19,7 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, message: string)
 export const initKeycloak = () => {
   if (!initPromise) {
     initPromise = keycloak.init({
-      onLoad: 'check-sso',
+      onLoad: 'login-required',
       pkceMethod: 'S256',
       checkLoginIframe: false,
     })
@@ -47,3 +47,24 @@ export const logoutFromKeycloak = () =>
   keycloak.logout({
     redirectUri: window.location.origin,
   })
+
+export const getKeycloakAccessRoles = () =>
+  keycloak.tokenParsed?.realm_access?.roles ?? []
+
+export const hasKeycloakAccessRole = () => {
+  const requiredRole = import.meta.env.VITE_KEYCLOAK_ACCESS_ROLE
+  if (!requiredRole) return true
+
+  return getKeycloakAccessRoles().includes(requiredRole)
+}
+
+export const getValidKeycloakToken = async () => {
+  await initKeycloak()
+  await keycloak.updateToken(30)
+
+  if (!keycloak.token) {
+    throw new Error('No hay token de Keycloak disponible.')
+  }
+
+  return keycloak.token
+}

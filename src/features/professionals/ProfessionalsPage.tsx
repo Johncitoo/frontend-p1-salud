@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { getMockSession } from '@/features/auth/mockAuth'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
 // ---- tipos ----
@@ -54,9 +54,9 @@ type ProfessionalsPageProps = {
 }
 
 const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
-  const session = getMockSession()
-  const canWrite = session?.role === 'ADMIN' || session?.role === 'COORDINADOR' || session?.role === 'SUPERVISOR'
-  const canDelete = session?.role === 'ADMIN' || session?.role === 'SUPERVISOR'
+  const session = useCurrentUser()
+  const canWrite = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
+  const canDelete = session.rol === 'ADMIN' || session.rol === 'SUPERVISOR'
 
   // estado general
   const [professionals, setProfessionals] = useState<Professional[]>([])

@@ -10,7 +10,7 @@ export type UserFormValues = {
 }
 
 export type UserPayload = {
-  identityUserId: string
+  identityUserId?: string
   rolId: string
   rut: string
   nombres: string
@@ -23,7 +23,7 @@ export type UserPayload = {
 export type UserFormErrors = Partial<Record<keyof UserFormValues, string>>
 
 export const createEmptyUserForm = (): UserFormValues => ({
-  identityUserId: crypto.randomUUID(),
+  identityUserId: '',
   rolId: '',
   rut: '',
   nombres: '',
@@ -38,7 +38,6 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export function validateUserForm(values: UserFormValues): UserFormErrors {
   const errors: UserFormErrors = {}
 
-  if (!values.identityUserId.trim()) errors.identityUserId = 'El identificador de identidad es obligatorio.'
   if (!values.rolId) errors.rolId = 'El rol es obligatorio.'
   if (!values.rut.trim()) errors.rut = 'El RUT es obligatorio.'
   if (!values.nombres.trim()) errors.nombres = 'Los nombres son obligatorios.'
@@ -53,7 +52,7 @@ export function validateUserForm(values: UserFormValues): UserFormErrors {
 
 export function buildUserPayload(values: UserFormValues): UserPayload {
   return {
-    identityUserId: values.identityUserId.trim(),
+    ...(values.identityUserId.trim() ? { identityUserId: values.identityUserId.trim() } : {}),
     rolId: values.rolId,
     rut: values.rut.trim(),
     nombres: values.nombres.trim(),

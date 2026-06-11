@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Pencil, Search, Trash2, UserPlus } from 'lucide-react'
 
-import { getMockSession } from '@/features/auth/mockAuth'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiDelete, apiGet } from '@/lib/api'
 import type { UserRow } from './types'
 
@@ -11,8 +11,8 @@ const UsersListPage = () => {
   const [users, setUsers] = useState<UserRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const session = getMockSession()
-  const canWriteUsers = session?.role === 'ADMIN'
+  const session = useCurrentUser()
+  const canWriteUsers = session.rol === 'ADMIN'
 
   const loadUsers = () => {
     setIsLoading(true)
@@ -41,7 +41,7 @@ const UsersListPage = () => {
         user.rut.toLowerCase().includes(normalizedQuery) ||
         fullName.includes(normalizedQuery) ||
         user.email.toLowerCase().includes(normalizedQuery) ||
-        user.identityUserId.toLowerCase().includes(normalizedQuery) ||
+        (user.identityUserId || '').toLowerCase().includes(normalizedQuery) ||
         (user.rol || '').toLowerCase().includes(normalizedQuery)
       )
     })
@@ -127,7 +127,7 @@ const UsersListPage = () => {
                   <td className='px-4 py-3'>{user.nombres} {user.apellidos}</td>
                   <td className='px-4 py-3'>{user.email}</td>
                   <td className='px-4 py-3'>{user.rol || '-'}</td>
-                  <td className='max-w-[260px] truncate px-4 py-3 font-mono text-xs'>{user.identityUserId}</td>
+                  <td className='max-w-[260px] truncate px-4 py-3 font-mono text-xs'>{user.identityUserId || 'Pendiente'}</td>
                   <td className='px-4 py-3'>
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-semibold ${

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapPinPlus, Pencil, Search, Trash2 } from 'lucide-react'
 
-import { getMockSession } from '@/features/auth/mockAuth'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiDelete, apiGet } from '@/lib/api'
 import type { ZoneRow } from './types'
 
@@ -10,9 +10,9 @@ const ZonesListPage = () => {
   const [zones, setZones] = useState<ZoneRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const session = getMockSession()
-  const canWriteZones = session?.role === 'ADMIN' || session?.role === 'COORDINADOR' || session?.role === 'SUPERVISOR'
-  const canDeleteZones = session?.role === 'ADMIN' || session?.role === 'SUPERVISOR'
+  const session = useCurrentUser()
+  const canWriteZones = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
+  const canDeleteZones = session.rol === 'ADMIN' || session.rol === 'SUPERVISOR'
 
   const loadZones = () => {
     setIsLoading(true)

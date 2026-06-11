@@ -1,4 +1,5 @@
 import { getMockAuthHeaders } from '@/features/auth/mockAuth'
+import { getValidKeycloakToken } from '@/features/auth/keycloak'
 
 const DEFAULT_API_URL = 'http://localhost:3000'
 export const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL
@@ -32,9 +33,18 @@ async function parseApiResponse<TResponse>(response: Response): Promise<TRespons
   return payload as TResponse
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const token = await getValidKeycloakToken()
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return getMockAuthHeaders()
+  }
+}
+
 export async function apiGet<TResponse>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: getMockAuthHeaders(),
+    headers: await getAuthHeaders(),
   })
 
   return parseApiResponse<TResponse>(response)
@@ -48,7 +58,7 @@ export async function apiPost<TResponse, TBody>(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getMockAuthHeaders(),
+      ...(await getAuthHeaders()),
     },
     body: JSON.stringify(body),
   })
@@ -64,7 +74,7 @@ export async function apiPatch<TResponse, TBody>(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      ...getMockAuthHeaders(),
+      ...(await getAuthHeaders()),
     },
     body: JSON.stringify(body),
   })
@@ -75,7 +85,7 @@ export async function apiPatch<TResponse, TBody>(
 export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
-    headers: getMockAuthHeaders(),
+    headers: await getAuthHeaders(),
   })
 
   return parseApiResponse<TResponse>(response)
@@ -94,8 +104,7 @@ export interface CurrentUserProfile {
 export async function fetchCurrentUser(accessToken?: string): Promise<CurrentUserProfile> {
   const response = await fetch(`${API_BASE_URL}/me`, {
     headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...getMockAuthHeaders(),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : await getAuthHeaders()),
     },
   })
 

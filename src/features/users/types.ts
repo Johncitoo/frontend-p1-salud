@@ -6,7 +6,7 @@ export type RoleOption = {
 
 export type UserRow = {
   id: string
-  identityUserId: string
+  identityUserId: string | null
   rolId: string
   rol: string | null
   rut: string

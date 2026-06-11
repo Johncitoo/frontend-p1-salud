@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   ClipboardList,
+  ClipboardPen,
   FileText,
   HeartPulse,
   Layers,
@@ -11,13 +12,13 @@ import {
   Users,
 } from 'lucide-react'
 
-import { getMockSession, logoutMock, type MockRole } from '@/features/auth/mockAuth'
+import { useAuthSession, type AppRole } from '@/features/auth/AuthSessionContext'
 
 type SidebarItem = {
   label: string
   href: string
   icon: ReactNode
-  roles: MockRole[]
+  roles: AppRole[]
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -27,6 +28,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
@@ -35,17 +37,16 @@ type AppLayoutProps = {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const session = getMockSession()
+  const { profile, logout } = useAuthSession()
   const pathname = window.location.pathname
 
-  if (!session) return <>{children}</>
+  if (!profile) return <>{children}</>
 
   const handleLogout = () => {
-    logoutMock()
-    window.location.href = '/'
+    logout()
   }
 
-  const visibleItems = sidebarItems.filter(item => item.roles.includes(session.role))
+  const visibleItems = sidebarItems.filter(item => item.roles.includes(profile.rol as AppRole))
 
   return (
     <div className='app-dark min-h-screen bg-[#182F3F] text-white lg:flex'>
@@ -61,7 +62,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             </span>
           </a>
           <div className='rounded-full bg-[#3C6E71] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white lg:mt-5 lg:inline-flex'>
-            {session.role}
+            {profile.rol}
           </div>
         </div>
 
@@ -91,8 +92,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
         <div className='hidden border-t border-[#3C6E71]/45 p-4 lg:block'>
           <div className='mb-3 rounded-2xl border border-[#3C6E71]/35 bg-[#284B63] p-3.5'>
-            <p className='text-sm font-semibold text-white'>{session.label}</p>
-            <p className='mt-1 text-xs font-medium text-[#D9D9D9]'>Sesión mock activa</p>
+            <p className='text-sm font-semibold text-white'>{profile.nombres} {profile.apellidos}</p>
+            <p className='mt-1 text-xs font-medium text-[#D9D9D9]'>{profile.email}</p>
           </div>
           <button
             onClick={handleLogout}

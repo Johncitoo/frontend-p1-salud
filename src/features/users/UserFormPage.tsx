@@ -16,7 +16,7 @@ const fieldClassName =
 const labelClassName = 'text-sm font-medium text-slate-700'
 
 const mapUserToForm = (user: UserRow): UserFormValues => ({
-  identityUserId: user.identityUserId,
+  identityUserId: user.identityUserId ?? '',
   rolId: user.rolId,
   rut: user.rut,
   nombres: user.nombres,
@@ -129,7 +129,8 @@ const UserFormPage = ({ userId }: UserFormPageProps) => {
           <ShieldAlert className='mt-0.5 size-4 shrink-0' />
           <p className='m-0'>
             Este formulario no guarda contraseñas. Puedes registrar email y perfil local, pero las credenciales reales
-            deben existir en el sistema centralizado.
+            deben existir en el sistema centralizado. Si dejas el Identity user ID vacio, se vinculara automaticamente
+            por email cuando la persona inicie sesion por primera vez.
           </p>
         </div>
 

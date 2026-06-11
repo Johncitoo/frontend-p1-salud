@@ -3,6 +3,7 @@ import {
   BriefcaseMedical,
   CalendarCheck2,
   ClipboardList,
+  ClipboardPen,
   FileText,
   MapPin,
   ShieldCheck,
@@ -11,7 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 
-import { getMockSession } from '@/features/auth/mockAuth'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 
 type NavCard = {
   title: string
@@ -30,12 +31,13 @@ const cards: NavCard[] = [
   { title: 'Usuarios', description: 'Administra perfiles del sistema.', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { title: 'Crear usuario', description: 'Registra un usuario y su rol.', href: '/users/new', icon: <UserCog className='size-5' />, roles: ['ADMIN'] },
   { title: 'Crear zona', description: 'Añade una zona de cobertura.', href: '/zones/new', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
+  { title: 'Fichas Clínicas', description: 'Registra atenciones con formularios guiados.', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { title: 'Auditoría', description: 'Revisa eventos y trazabilidad.', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 const DashboardPage = () => {
-  const session = getMockSession()
-  const filteredCards = cards.filter(card => session && card.roles.includes(session.role))
+  const session = useCurrentUser()
+  const filteredCards = cards.filter(card => card.roles.includes(session.rol))
 
   return (
     <main className='min-h-screen bg-[#182F3F] px-4 py-5 sm:px-6 sm:py-7 xl:px-10 xl:py-9'>
@@ -43,7 +45,7 @@ const DashboardPage = () => {
         <header className='mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between'>
           <div>
             <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Panel operativo</p>
-            <h1 className='m-0 mt-2 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl'>Hola, {session?.label}</h1>
+            <h1 className='m-0 mt-2 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl'>Hola, {session.nombres}</h1>
             <p className='mt-3 max-w-2xl text-sm font-medium leading-6 text-[#D9D9D9] sm:text-base'>
               Revisa el estado general y accede a los módulos disponibles para tu perfil.
             </p>
@@ -114,7 +116,7 @@ const DashboardPage = () => {
               <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>Accesos rápidos</p>
               <h2 className='m-0 mt-1 text-2xl font-semibold tracking-[-0.025em] text-white'>Módulos disponibles</h2>
             </div>
-            <p className='hidden text-xs font-semibold text-[#D9D9D9] sm:block'>Permisos según perfil {session?.role}</p>
+            <p className='hidden text-xs font-semibold text-[#D9D9D9] sm:block'>Permisos según perfil {session.rol}</p>
           </div>
 
           <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>

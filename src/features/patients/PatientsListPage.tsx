@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Search, UserPlus } from 'lucide-react'
 
-import { getMockSession } from '@/features/auth/mockAuth'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiGet } from '@/lib/api'
 
 type PatientRow = {
@@ -28,8 +28,8 @@ const PatientsListPage = () => {
   const [patients, setPatients] = useState<PatientRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const session = getMockSession()
-  const canCreatePatients = session?.role === 'ADMIN' || session?.role === 'COORDINADOR' || session?.role === 'SUPERVISOR'
+  const session = useCurrentUser()
+  const canCreatePatients = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
 
   useEffect(() => {
     let isMounted = true

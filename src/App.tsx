@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import AppLayout from '@/components/AppLayout'
 import LoginPage from './features/auth/LoginPage'
 import DashboardPage from './features/dashboard/DashboardPage'
@@ -9,24 +11,75 @@ import ZoneFormPage from './features/zones/ZoneFormPage'
 import ZonesListPage from './features/zones/ZonesListPage'
 import ProfessionalsPage from './features/professionals/ProfessionalsPage'
 import AuditPage from './features/audit/AuditPage'
-import { getMockSession } from './features/auth/mockAuth'
+import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
+import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
+import { useAuthSession } from './features/auth/AuthSessionContext'
+
+const FullPageMessage = ({
+  title,
+  message,
+  action,
+}: {
+  title: string
+  message: string
+  action?: ReactNode
+}) => (
+  <main className='grid min-h-screen place-items-center bg-[#182F3F] px-6 text-white'>
+    <section className='w-full max-w-md rounded-3xl border border-[#3C6E71]/50 bg-[#203C50] p-8 text-center shadow-xl shadow-black/20'>
+      <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#9CBFC1]'>Salud en Casa</p>
+      <h1 className='mt-3 text-2xl font-semibold text-white'>{title}</h1>
+      <p className='mt-3 text-sm leading-6 text-[#D9D9D9]'>{message}</p>
+      {action ? <div className='mt-6'>{action}</div> : null}
+    </section>
+  </main>
+)
 
 function App() {
   const pathname = window.location.pathname
-  const session = getMockSession()
+  const { status, error, logout } = useAuthSession()
 
-  // login sin sidebar
-  if (pathname === '/' || pathname === '/auth/login') {
-    if (session) {
-      window.location.href = '/dashboard'
-      return null
-    }
-    return <LoginPage />
+  if (status === 'loading') {
+    return <FullPageMessage title='Conectando con identidad' message='Estamos validando tu sesion en el Sistema de Identidad.' />
   }
 
-  // proteger rutas internas
-  if (!session) {
-    window.location.href = '/'
+  if (status === 'access-denied') {
+    return (
+      <FullPageMessage
+        title='Acceso denegado'
+        message='Tu cuenta existe en el Sistema de Identidad, pero no tiene el rol de acceso requerido para Proyecto 1.'
+        action={
+          <button
+            type='button'
+            onClick={logout}
+            className='rounded-xl border border-[#3C6E71] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3C6E71]'
+          >
+            Cerrar sesion
+          </button>
+        }
+      />
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <FullPageMessage
+        title='No pudimos cargar tu perfil'
+        message={error || 'Tu identidad fue validada, pero no encontramos un usuario local activo asociado.'}
+        action={
+          <button
+            type='button'
+            onClick={logout}
+            className='rounded-xl border border-[#3C6E71] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3C6E71]'
+          >
+            Cerrar sesion
+          </button>
+        }
+      />
+    )
+  }
+
+  if (pathname === '/' || pathname === '/auth/login') {
+    window.location.href = '/dashboard'
     return null
   }
 
@@ -51,6 +104,14 @@ function App() {
     if (professionalEditMatch) return <ProfessionalsPage editId={professionalEditMatch[1]} />
 
     if (pathname === '/audit') return <AuditPage />
+
+    // Fichas clínicas
+    if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />
+    if (pathname === '/fichas-clinicas/new') return <FichaClinicaFormPage />
+    const fichaEditMatch = pathname.match(/^\/fichas-clinicas\/([^/]+)\/editar$/)
+    if (fichaEditMatch) return <FichaClinicaFormPage fichaId={fichaEditMatch[1]} />
+    const fichaViewMatch = pathname.match(/^\/fichas-clinicas\/([^/]+)$/)
+    if (fichaViewMatch) return <FichaClinicaFormPage fichaId={fichaViewMatch[1]} />
 
     window.location.href = '/dashboard'
     return null
