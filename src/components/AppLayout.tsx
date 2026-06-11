@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 
 import { useAuthSession, type AppRole } from '@/features/auth/AuthSessionContext'
+import { roleHomePath } from '@/lib/roleHome'
 
 type SidebarItem = {
   label: string
@@ -24,10 +25,10 @@ type SidebarItem = {
 const sidebarItems: SidebarItem[] = [
   { label: 'Panel', href: '/dashboard', icon: <Layers className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Pacientes', href: '/patients', icon: <Users className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
+  { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL'] },
   { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
-  { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
+  { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
@@ -46,13 +47,16 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     logout()
   }
 
-  const visibleItems = sidebarItems.filter(item => item.roles.includes(profile.rol as AppRole))
+  const homePath = roleHomePath(profile.rol as AppRole)
+  const visibleItems = sidebarItems
+    .filter(item => item.roles.includes(profile.rol as AppRole))
+    .map(item => item.label === 'Panel' ? { ...item, href: homePath } : item)
 
   return (
     <div className='app-dark min-h-screen bg-[#182F3F] text-white lg:flex'>
       <aside className='border-b border-[#3C6E71]/60 bg-[#203C50] text-white shadow-xl shadow-black/20 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r'>
         <div className='flex items-center justify-between px-5 py-5 lg:block lg:px-6 lg:py-7'>
-          <a href='/dashboard' className='flex items-center gap-3'>
+          <a href={homePath} className='flex items-center gap-3'>
             <span className='grid size-11 place-items-center rounded-2xl bg-[#284B63] text-white shadow-md shadow-[#284B63]/15'>
               <HeartPulse className='size-6' aria-hidden='true' />
             </span>

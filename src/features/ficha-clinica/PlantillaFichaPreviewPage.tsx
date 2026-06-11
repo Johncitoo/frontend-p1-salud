@@ -64,7 +64,7 @@ const renderPreviewInput = (campo: PlantillaCampoRow) => {
 const PlantillaFichaPreviewPage = ({ plantillaId }: PlantillaFichaPreviewPageProps) => {
   const session = useCurrentUser()
   const canEdit =
-    session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
+    session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
 
   const [plantilla, setPlantilla] = useState<PlantillaFichaRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)

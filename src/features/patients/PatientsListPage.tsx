@@ -29,7 +29,7 @@ const PatientsListPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const session = useCurrentUser()
-  const canCreatePatients = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
+  const canCreatePatients = session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'PROFESIONAL'
 
   useEffect(() => {
     let isMounted = true

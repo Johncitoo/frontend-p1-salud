@@ -8,7 +8,7 @@ import type { PlantillaFichaRow } from './types'
 const FichaClinicaListPage = () => {
   const session = useCurrentUser()
   const canManageTemplates =
-    session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'SUPERVISOR'
+    session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
   const canFillForms =
     session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'PROFESIONAL'
 
