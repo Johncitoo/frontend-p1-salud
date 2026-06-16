@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import {
   ClipboardList,
   ClipboardPen,
+  CalendarDays,
   FileText,
   HeartPulse,
   Layers,
@@ -26,6 +27,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Panel', href: '/dashboard', icon: <Layers className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Pacientes', href: '/patients', icon: <Users className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL'] },
+  { label: 'Agenda', href: '/agenda', icon: <CalendarDays className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },

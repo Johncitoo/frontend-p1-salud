@@ -10,6 +10,7 @@ export const canAccessPath = (role: AppRole, pathname: string) => {
 
   if (pathname === '/patients') return true
   if (pathname === '/patients/new') return role === 'COORDINADOR' || role === 'PROFESIONAL'
+  if (pathname === '/agenda' || pathname === '/visitas') return true
 
   if (pathname === '/fichas-clinicas') return true
   if (pathname === '/fichas-clinicas/llenar') return role === 'COORDINADOR' || role === 'PROFESIONAL'
