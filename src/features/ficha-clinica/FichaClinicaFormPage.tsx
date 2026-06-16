@@ -27,12 +27,12 @@ const labelClassName = 'text-sm font-medium text-slate-700'
 const checkClassName = 'mt-1.5 size-5 rounded border-slate-300 text-[#3C6E71] focus:ring-[#3C6E71]/20'
 
 const formatVisitLabel = (visita: VisitaOptionRow) => {
-  const fecha = visita.fechaRealizada ?? visita.fechaProgramada ?? visita.createdAt
+  const fecha = visita.fechaProgramada ?? visita.createdAt
   const fechaLabel = fecha
-    ? new Date(fecha).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
+    ? new Date(`${fecha}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'medium' })
     : 'Sin fecha'
 
-  return `${fechaLabel}${visita.estado ? ` · ${visita.estado}` : ''}`
+  return `${fechaLabel}${visita.horaProgramada ? ` ${visita.horaProgramada.slice(0, 5)}` : ''}${visita.estado ? ` · ${visita.estado}` : ''}`
 }
 
 const sortPlantillas = (plantillas: PlantillaFichaRow[]) =>
@@ -62,9 +62,11 @@ type FichaFormDraft = {
 }
 
 const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaFormPageProps) => {
-  const isEditing = Boolean(fichaId)
   const draftKey = `ficha-form:${fichaId ?? propVisitaId ?? 'new'}`
   const shouldSaveDraftRef = useRef(true)
+  const [createdFichaId, setCreatedFichaId] = useState<string | null>(null)
+  const effectiveFichaId = fichaId ?? createdFichaId
+  const isEditing = Boolean(effectiveFichaId)
 
   // Estados
   const [plantillas, setPlantillas] = useState<PlantillaFichaRow[]>([])
@@ -117,14 +119,13 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setPlantillaFichaId(activePlantillas[0].id)
         }
 
-        if (fichaId) {
-          // Modo edición: cargar ficha existente
-          const ficha = await apiGet<FichaClinicaRow>(`/fichas-clinicas/${fichaId}`)
+        const applyFicha = async (ficha: FichaClinicaRow) => {
           if (cancelled) return
 
           setVisitaId(ficha.visitaId)
           setCurrentVersion(ficha.version)
           setFichaEstado(ficha.estado)
+          setCreatedFichaId(current => current ?? ficha.id)
 
           if (ficha.plantillaFichaId) {
             setPlantillaFichaId(ficha.plantillaFichaId)
@@ -142,9 +143,18 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
             setFields(formValues.fields)
             setObservaciones(formValues.observaciones)
           }
+        }
+
+        if (fichaId) {
+          // Modo edición: cargar ficha existente
+          const ficha = await apiGet<FichaClinicaRow>(`/fichas-clinicas/${fichaId}`)
+          await applyFicha(ficha)
         } else if (propVisitaId) {
-          // Modo creación desde visita
+          // Modo creación desde visita. Si la visita ya tiene ficha, se continúa esa ficha.
           setVisitaId(propVisitaId)
+          const existing = await apiGet<FichaClinicaRow[]>(`/fichas-clinicas?visitaId=${propVisitaId}`)
+          if (cancelled) return
+          if (existing[0]) await applyFicha(existing[0])
         }
 
         const draft = readDraft<FichaFormDraft>(draftKey)
@@ -270,33 +280,12 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
   }
 
   const handleCreateVisit = async () => {
-    if (!pacienteId) {
-      setError('Selecciona un paciente antes de crear una visita.')
-      return
-    }
-
     setIsCreatingVisit(true)
-    setError('')
-
-    try {
-      const created = await apiPost<VisitaOptionRow, {
-        pacienteId: string
-        fechaProgramada: string
-        observacion: string
-      }>(`/pacientes/${pacienteId}/visitas`, {
-        pacienteId,
-        fechaProgramada: new Date().toISOString(),
-        observacion: 'Visita creada desde ficha clinica',
-      })
-
-      setVisitas(prev => [created, ...prev])
-      setVisitaId(created.id)
-      setSuccessMsg('Visita creada y seleccionada para esta ficha.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la visita.')
-    } finally {
-      setIsCreatingVisit(false)
-    }
+    setError('Las visitas ahora se crean desde Agenda para poder asignar profesional, fecha y hora.')
+    window.setTimeout(() => {
+      window.location.href = '/agenda'
+    }, 700)
+    window.setTimeout(() => setIsCreatingVisit(false), 700)
   }
 
   const handleSubmit = async (e: FormEvent, cerrar: boolean) => {
@@ -334,14 +323,16 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
 
       if (cerrar) payload.estado = 'CERRADA'
 
-      if (isEditing) {
+      const targetFichaId = fichaId ?? createdFichaId
+
+      if (targetFichaId) {
         // PATCH con version para optimistic locking
         const updated = await apiPatch<FichaClinicaRow, FichaClinicaPayload>(
-          `/fichas-clinicas/${fichaId}?version=${currentVersion}`,
+          `/fichas-clinicas/${targetFichaId}?version=${currentVersion}`,
           payload,
         )
         setCurrentVersion(updated.version)
-        if (cerrar) setFichaEstado('CERRADA')
+        setFichaEstado(updated.estado)
         setSuccessMsg(cerrar ? 'Ficha clínica cerrada correctamente.' : 'Ficha clínica actualizada.')
         shouldSaveDraftRef.current = false
         clearDraft(draftKey)
@@ -350,18 +341,9 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           '/fichas-clinicas',
           payload,
         )
+        setCreatedFichaId(created.id)
         setCurrentVersion(created.version)
         setFichaEstado(created.estado)
-
-        if (cerrar) {
-          // Cerrar después de crear
-          const closed = await apiPatch<FichaClinicaRow, { estado: string }>(
-            `/fichas-clinicas/${created.id}/cerrar`,
-            { estado: 'CERRADA' },
-          )
-          setFichaEstado('CERRADA')
-          setCurrentVersion(closed.version)
-        }
 
         setSuccessMsg(cerrar ? 'Ficha clínica creada y cerrada.' : 'Ficha clínica creada correctamente.')
         shouldSaveDraftRef.current = false

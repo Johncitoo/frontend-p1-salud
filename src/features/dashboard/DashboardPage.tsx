@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   BriefcaseMedical,
+  CalendarDays,
   CalendarCheck2,
   ClipboardList,
   ClipboardPen,
@@ -26,6 +27,7 @@ type NavCard = {
 const cards: NavCard[] = [
   { title: 'Pacientes', description: 'Consulta fichas y datos de atención.', href: '/patients', icon: <Users className='size-5' />, emphasis: true, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { title: 'Registrar paciente', description: 'Incorpora un nuevo paciente.', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL'] },
+  { title: 'Agenda', description: 'Programa visitas y controla atenciones.', href: '/agenda', icon: <CalendarDays className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { title: 'Profesionales', description: 'Gestiona equipos y asignaciones.', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { title: 'Zonas', description: 'Administra áreas de cobertura.', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { title: 'Usuarios', description: 'Administra perfiles del sistema.', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },

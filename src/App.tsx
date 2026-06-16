@@ -10,6 +10,7 @@ import UsersListPage from './features/users/UsersListPage'
 import ZoneFormPage from './features/zones/ZoneFormPage'
 import ZonesListPage from './features/zones/ZonesListPage'
 import ProfessionalsPage from './features/professionals/ProfessionalsPage'
+import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
@@ -145,6 +146,7 @@ function App() {
 
     if (pathname === '/patients') return <PatientsListPage />
     if (pathname === '/patients/new') return <PatientRegistrationPage />
+    if (pathname === '/agenda' || pathname === '/visitas') return <AgendaPage />
 
     if (pathname === '/users') return <UsersListPage />
     if (pathname === '/users/new') return <UserFormPage />
@@ -165,7 +167,10 @@ function App() {
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />
     if (pathname === '/fichas-clinicas/new') return <PlantillaFichaBuilderPage />
-    if (pathname === '/fichas-clinicas/llenar') return <FichaClinicaFormPage />
+    if (pathname === '/fichas-clinicas/llenar') {
+      const visitaId = new URLSearchParams(window.location.search).get('visitaId') ?? undefined
+      return <FichaClinicaFormPage visitaId={visitaId} />
+    }
     const plantillaPreviewMatch = pathname.match(/^\/fichas-clinicas\/plantillas\/([^/]+)$/)
     if (plantillaPreviewMatch) return <PlantillaFichaPreviewPage plantillaId={plantillaPreviewMatch[1]} />
     const plantillaEditMatch = pathname.match(/^\/fichas-clinicas\/plantillas\/([^/]+)\/editar$/)

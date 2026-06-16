@@ -34,10 +34,12 @@ export type PatientOptionRow = {
 export type VisitaOptionRow = {
   id: string
   pacienteId: string
+  profesionalSaludId?: string
+  zonaId?: string | null
   fechaProgramada?: string | null
-  fechaRealizada?: string | null
+  horaProgramada?: string | null
   estado?: string | null
-  observacion?: string | null
+  prioridad?: string | null
   createdAt: string
 }
 
