@@ -1,17 +1,5 @@
 import Dexie, { type Table } from 'dexie';
 
-// Polyfill para IndexedDB en entornos nativos de React Native (donde no hay IndexedDB global)
-if (typeof globalThis !== 'undefined' && !globalThis.indexedDB) {
-  try {
-    const { indexedDB, IDBKeyRange } = require('fake-indexeddb');
-    (globalThis as any).indexedDB = indexedDB;
-    (globalThis as any).IDBKeyRange = IDBKeyRange;
-    console.log("IndexedDB polyfilled successfully with fake-indexeddb.");
-  } catch (e) {
-    console.error("Fallo al aplicar polyfill de fake-indexeddb:", e);
-  }
-}
-
 export interface LocalVisita {
   id: string;
   hora: string;
