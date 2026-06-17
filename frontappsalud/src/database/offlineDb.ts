@@ -1,0 +1,71 @@
+import Dexie, { type Table } from 'dexie';
+
+// Polyfill para IndexedDB en entornos nativos de React Native (donde no hay IndexedDB global)
+if (typeof globalThis !== 'undefined' && !globalThis.indexedDB) {
+  try {
+    const { indexedDB, IDBKeyRange } = require('fake-indexeddb');
+    (globalThis as any).indexedDB = indexedDB;
+    (globalThis as any).IDBKeyRange = IDBKeyRange;
+    console.log("IndexedDB polyfilled successfully with fake-indexeddb.");
+  } catch (e) {
+    console.error("Fallo al aplicar polyfill de fake-indexeddb:", e);
+  }
+}
+
+export interface LocalVisita {
+  id: string;
+  hora: string;
+  estado: string;
+  prioridad: string;
+  paciente: {
+    nombres: string;
+    apellidos: string;
+    rut: string;
+  };
+  direccion: {
+    calle: string;
+    numero: string;
+    comuna: string;
+  };
+  prestacion: string;
+}
+
+export interface LocalPlantilla {
+  id: string;
+  codigo: string;
+  nombre: string;
+  campos: Array<{
+    codigo: string;
+    etiqueta: string;
+    tipo: 'TEXTO_LIBRE' | 'NUMERO_LIBRE' | 'BOOLEANO' | 'SELECT';
+    obligatorio: boolean;
+    placeholder?: string;
+    opciones?: string[];
+  }>;
+}
+
+export interface SyncQueueItem {
+  id?: number;
+  tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA';
+  visita_id: string;
+  data: any;
+  timestamp: number;
+}
+
+class ClinicaOfflineDB extends Dexie {
+  visitas!: Table<LocalVisita>;
+  plantillas!: Table<LocalPlantilla>;
+  syncQueue!: Table<SyncQueueItem>;
+
+  constructor() {
+    super('ClinicaOfflineDB');
+    this.version(1).stores({
+      visitas: 'id, hora, estado',
+      plantillas: 'id, codigo',
+      syncQueue: '++id, tipo, visita_id, timestamp'
+    });
+  }
+}
+
+export const db = new ClinicaOfflineDB();
+export default db;

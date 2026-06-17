@@ -83,32 +83,56 @@ const INITIAL_VISITAS = [
   }
 ];
 
+import { syncService } from './src/services/syncService';
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'LOGIN' | 'ITINERARY' | 'VISIT_DETAIL' | 'SETTINGS'>('LOGIN');
-  const [visitas, setVisitas] = useState(INITIAL_VISITAS);
+  const [visitas, setVisitas] = useState<any[]>([]);
+  const [plantillas, setPlantillas] = useState<any[]>([]);
   const [selectedVisitaId, setSelectedVisitaId] = useState<string | null>(null);
   
   // Estado de red global
   const [isOnline, setIsOnline] = useState(true);
 
-  // Inicializar base de datos local Dexie con datos semilla si está vacía
-  useEffect(() => {
-    const seedLocalDatabase = async () => {
-      try {
-        const count = await db.visitas.count();
-        if (count === 0) {
-          await db.visitas.bulkAdd(INITIAL_VISITAS);
-          console.log("Semilla de visitas cargada en IndexedDB.");
-        } else {
-          const localItems = await db.visitas.toArray();
-          setVisitas(localItems);
-        }
-      } catch (err) {
-        console.error("Fallo al inicializar base de datos Dexie:", err);
+  const handleDescargarDatos = async () => {
+    try {
+      console.log("Sincronizando datos con el backend...");
+      if (isOnline) {
+        await syncService.descargarDatosDelDia('e88b8888-8888-4888-8888-e88b88888888');
       }
-    };
-    seedLocalDatabase();
-  }, []);
+      const localVisitas = await db.visitas.toArray();
+      const localPlantillas = await db.plantillas.toArray();
+      
+      setVisitas(localVisitas);
+      setPlantillas(localPlantillas);
+    } catch (err) {
+      console.error("Fallo al descargar datos del backend:", err);
+      const localVisitas = await db.visitas.toArray();
+      const localPlantillas = await db.plantillas.toArray();
+      
+      if (localVisitas.length === 0) {
+        await db.visitas.bulkAdd(INITIAL_VISITAS);
+        setVisitas(INITIAL_VISITAS);
+      } else {
+        setVisitas(localVisitas);
+      }
+      setPlantillas(localPlantillas);
+    }
+  };
+
+  const handleRegistrarAtencion = async (tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => {
+    try {
+      await syncService.guardarAtencionLocal(tipo, visitaId, data);
+      console.log(`Atención guardada localmente en Dexie: ${tipo} para visita ${visitaId}`);
+    } catch (err) {
+      console.error("Error guardando atención en IndexedDB:", err);
+    }
+  };
+
+  // Inicializar base de datos local y descargar datos dinámicos
+  useEffect(() => {
+    handleDescargarDatos();
+  }, [isOnline]);
 
   const handleLoginSuccess = () => {
     setCurrentScreen('ITINERARY');
@@ -182,13 +206,16 @@ export default function App() {
               visitas={visitas}
               onSelectVisita={handleSelectVisita} 
               isOnline={isOnline}
+              onSync={handleDescargarDatos}
             />
           )}
           {currentScreen === 'VISIT_DETAIL' && selectedVisita && (
             <VisitDetailScreen 
               visita={selectedVisita}
+              plantillas={plantillas}
               onBack={() => setCurrentScreen('ITINERARY')}
               onUpdateVisitaState={handleUpdateVisitaState}
+              onRegisterAttention={handleRegistrarAtencion}
               onScheduleFollowUp={handleCrearVisitaSeguimiento}
             />
           )}
