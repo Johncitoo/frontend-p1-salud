@@ -64,3 +64,22 @@ npm run start
 Una vez que se inicie, podrás:
 *   Presionar `w` para abrirlo en el navegador web.
 *   Escanear el código QR que aparecerá en pantalla con la aplicación **Expo Go** en tu celular (iOS o Android) para probarlo directamente en tu dispositivo físico en tiempo real.
+
+---
+
+## 🚀 Creación e Integración de appBack (Backend de la App Móvil)
+
+Hemos creado e inicializado desde cero un nuevo backend modular en **NestJS** en la ruta `C:\Users\monse\OneDrive\Documentos\GitHub\appBack`. Este backend está conectado a una base de datos local SQLite y diseñado con **TypeORM** para ser 100% compatible con la base de datos PostgreSQL online (`bd.sql`) en producción.
+
+### Logros Clave en el Backend:
+1. **Modelado Relacional Completo**: Se mapearon las entidades clave (`Paciente`, `DireccionPaciente`, `Visita`, `PlantillaFicha`, `PlantillaFichaCampo`, `VariableClinica`, `FichaClinica`) respetando fielmente los tipos e índices definidos en la base de datos de producción (`bd.sql`).
+2. **Endpoints de Sincronización**:
+   - `GET /visitas?profesionalId=...`: Retorna las visitas programadas asignadas al profesional con datos estructurados de paciente y dirección.
+   - `GET /plantillas-ficha`: Resuelve y formatea de forma plana los campos dinámicos y sus opciones para el consumo de la app móvil.
+   - `POST /visitas/checkpoint`: Maneja el check-in y check-out georreferenciado en terreno, actualizando el estado de la visita en caliente.
+   - `POST /fichas-clinicas`: Desempaqueta y unifica el "sobre" (envelope) JSON que envía la cola offline de React Native, persistiendo firmas digitales, conformidad y datos clínicos en la columna `contenido` de tipo `JSONB`.
+3. **Prueba de Integración Exitosa**:
+   - Se corrigieron los UUIDs de la base de datos semilla a la especificación estándar RFC4122 v4 (ej. `10000000-1111-4111-a111-100000000000`).
+   - Ejecutamos con éxito las pruebas de integración en `test_api.js`, simulando el flujo completo de Check-in GPS y subida de Ficha Clínica offline, logrando una sincronización limpia con códigos `201 Created` y transiciones automáticas de visitas al estado `REALIZADA`.
+4. **Conexión Frontend-Backend**:
+   - Actualizamos el `API_BASE_URL` en `syncService.ts` a `http://localhost:3000`, dejando una nota sobre el direccionamiento alternativo si pruebas en un emulador Android (`http://10.0.2.2:3000`) o dispositivo físico.

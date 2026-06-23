@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CircleCheck, Search, XCircle } from 'lucide-react'
+import { CalendarDays, CircleCheck, Pencil, Search, XCircle } from 'lucide-react'
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
-import { apiGet, apiPatch, apiPost } from '@/lib/api'
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
 type VisitRow = {
   id: string
@@ -111,6 +111,7 @@ const AgendaPage = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null)
 
   const patientById = useMemo(() => new Map(patients.map(patient => [patient.id, patient])), [patients])
   const professionalById = useMemo(() => new Map(professionals.map(professional => [professional.id, professional])), [professionals])
@@ -178,7 +179,48 @@ const AgendaPage = () => {
     })
   }, [patientById, professionalById, query, visits, zoneById])
 
-  const handleCreate = async (event: FormEvent) => {
+  const syncVisitPrestaciones = async (visitId: string, selectedPrestacionIds: string[]) => {
+    const currentRows = visitPrestaciones[visitId] ?? []
+    const currentIds = new Set(currentRows.map(row => row.prestacionId))
+    const selectedIds = new Set(selectedPrestacionIds)
+
+    await Promise.all([
+      ...selectedPrestacionIds
+        .filter(prestacionId => !currentIds.has(prestacionId))
+        .map(prestacionId =>
+          apiPost<VisitPrestacionRow, { prestacionId: string }>(`/visitas/${visitId}/prestaciones`, { prestacionId }),
+        ),
+      ...currentRows
+        .filter(row => !selectedIds.has(row.prestacionId))
+        .map(row => apiDelete<VisitPrestacionRow>(`/visitas/${visitId}/prestaciones/${row.prestacionId}`)),
+    ])
+  }
+
+  const resetVisitForm = () => {
+    setForm(emptyForm)
+    setEditingVisitId(null)
+  }
+
+  const handleEdit = (visit: VisitRow) => {
+    setError('')
+    setSuccessMsg('')
+    setEditingVisitId(visit.id)
+    setForm({
+      pacienteId: visit.pacienteId,
+      profesionalSaludId: visit.profesionalSaludId,
+      zonaId: visit.zonaId ?? '',
+      fechaProgramada: visit.fechaProgramada,
+      horaProgramada: visit.horaProgramada?.slice(0, 5) ?? '09:00',
+      duracionEstimadaMin: String(visit.duracionEstimadaMin ?? 60),
+      prioridad: visit.prioridad,
+      prestacionIds: (visitPrestaciones[visit.id] ?? [])
+        .filter(item => item.estado !== 'CANCELADA')
+        .map(item => item.prestacionId),
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSubmitVisit = async (event: FormEvent) => {
     event.preventDefault()
     if (!form.pacienteId || !form.profesionalSaludId || !form.fechaProgramada || !form.horaProgramada) {
       setError('Completa paciente, profesional, fecha y hora.')
@@ -190,7 +232,7 @@ const AgendaPage = () => {
     setSuccessMsg('')
 
     try {
-      const created = await apiPost<VisitRow, Record<string, unknown>>('/visitas', {
+      const payload = {
         pacienteId: form.pacienteId,
         profesionalSaludId: form.profesionalSaludId,
         zonaId: form.zonaId || undefined,
@@ -198,19 +240,22 @@ const AgendaPage = () => {
         horaProgramada: form.horaProgramada,
         duracionEstimadaMin: Number(form.duracionEstimadaMin || 60),
         prioridad: form.prioridad,
-      })
+      }
 
-      await Promise.all(
-        form.prestacionIds.map(prestacionId =>
-          apiPost<VisitPrestacionRow, { prestacionId: string }>(`/visitas/${created.id}/prestaciones`, { prestacionId }),
-        ),
-      )
+      if (editingVisitId) {
+        await apiPatch<VisitRow, Record<string, unknown>>(`/visitas/${editingVisitId}`, payload)
+        await syncVisitPrestaciones(editingVisitId, form.prestacionIds)
+        setSuccessMsg('Visita actualizada correctamente.')
+      } else {
+        const created = await apiPost<VisitRow, Record<string, unknown>>('/visitas', payload)
+        await syncVisitPrestaciones(created.id, form.prestacionIds)
+        setSuccessMsg('Visita creada correctamente.')
+      }
 
-      setForm(emptyForm)
-      setSuccessMsg('Visita creada correctamente.')
+      resetVisitForm()
       loadData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No fue posible crear la visita.')
+      setError(err instanceof Error ? err.message : 'No fue posible guardar la visita.')
     } finally {
       setIsSaving(false)
     }
@@ -220,6 +265,14 @@ const AgendaPage = () => {
     setError('')
     setSuccessMsg('')
     try {
+      if (estado === 'REALIZADA') {
+        const puntual = window.confirm('¿La visita fue puntual?')
+        await apiPatch<VisitRow, { puntual: boolean }>(`/visitas/${visit.id}/completar`, { puntual })
+        setSuccessMsg(puntual ? 'Visita marcada como realizada y puntual.' : 'Visita marcada como realizada.')
+        loadData()
+        return
+      }
+
       await apiPatch<VisitRow, { estado: string }>(`/visitas/${visit.id}/estado`, { estado })
       setSuccessMsg(`Visita marcada como ${estado}.`)
       loadData()
@@ -268,10 +321,19 @@ const AgendaPage = () => {
         {successMsg && <div className='rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>{successMsg}</div>}
 
         {canWrite ? (
-          <form onSubmit={handleCreate} className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-            <div className='mb-4 flex items-center gap-2'>
-              <CalendarDays className='size-5 text-[#3C6E71]' />
-              <h2 className='m-0 text-lg font-semibold text-slate-900'>Crear visita</h2>
+          <form onSubmit={handleSubmitVisit} className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+            <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
+              <div className='flex items-center gap-2'>
+                <CalendarDays className='size-5 text-[#3C6E71]' />
+                <h2 className='m-0 text-lg font-semibold text-slate-900'>
+                  {editingVisitId ? 'Editar visita' : 'Crear visita'}
+                </h2>
+              </div>
+              {editingVisitId ? (
+                <button type='button' onClick={resetVisitForm} className='rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50'>
+                  Cancelar edición
+                </button>
+              ) : null}
             </div>
             <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
               <label className='text-sm font-semibold text-slate-700'>
@@ -324,7 +386,7 @@ const AgendaPage = () => {
               </label>
               <div className='flex items-end'>
                 <button type='submit' disabled={isSaving} className='w-full rounded-lg bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#284B63] disabled:opacity-60'>
-                  {isSaving ? 'Creando...' : 'Crear visita'}
+                  {isSaving ? 'Guardando...' : editingVisitId ? 'Actualizar visita' : 'Crear visita'}
                 </button>
               </div>
             </div>
@@ -436,6 +498,11 @@ const AgendaPage = () => {
                       <td className='px-4 py-3'>
                         <div className='flex flex-wrap gap-2'>
                           <a href={`/fichas-clinicas/llenar?visitaId=${visit.id}`} className='rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100'>Ficha</a>
+                          {canWrite && !['CANCELADA', 'REALIZADA'].includes(visit.estado) ? (
+                            <button onClick={() => handleEdit(visit)} className='inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100'>
+                              <Pencil className='size-3' /> Editar
+                            </button>
+                          ) : null}
                           {canChangeState && visit.estado === 'PROGRAMADA' ? (
                             <button onClick={() => handleChangeState(visit, 'EN_ATENCION')} className='inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50'>
                               <CalendarDays className='size-3' /> Iniciar
