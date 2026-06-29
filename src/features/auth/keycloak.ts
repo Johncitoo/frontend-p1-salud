@@ -58,6 +58,21 @@ export const hasKeycloakAccessRole = () => {
   return getKeycloakAccessRoles().includes(requiredRole)
 }
 
+// Roles de aplicación del Grupo 12: resource_access.<clientId>.roles
+// Ej: resource_access.p1.roles = ["admin"]
+export const getKeycloakAppRoles = (): string[] => {
+  const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'p1'
+  const resourceAccess = keycloak.tokenParsed?.resource_access as
+    | Record<string, { roles?: string[] }>
+    | undefined
+  return resourceAccess?.[clientId]?.roles ?? []
+}
+
+export const getKeycloakAppRole = (): string | null => {
+  const roles = getKeycloakAppRoles()
+  return roles[0] ?? null
+}
+
 export const getValidKeycloakToken = async () => {
   await initKeycloak()
   await keycloak.updateToken(30)
