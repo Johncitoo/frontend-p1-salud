@@ -69,7 +69,11 @@ type VisitForm = {
   prestacionIds: string[]
 }
 
-const today = new Date().toISOString().slice(0, 10)
+// Fecha local (zona horaria del navegador), no UTC. Usar toISOString() aquí
+// provocaba que después de las ~20:00 en Chile (UTC-4) el form se prellenara
+// con el día siguiente.
+const now = new Date()
+const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
 const emptyForm: VisitForm = {
   pacienteId: '',
