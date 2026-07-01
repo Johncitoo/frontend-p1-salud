@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CircleCheck, Pencil, Search, XCircle } from 'lucide-react'
+import { CalendarDays, CircleCheck, Pencil, Search, XCircle, Calendar as CalendarIcon, List, Link as LinkIcon, RefreshCcw } from 'lucide-react'
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
+import CalendarView, { CalendarVisitRow } from './CalendarView'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
 type VisitRow = {
@@ -69,6 +70,13 @@ type VisitForm = {
   prestacionIds: string[]
 }
 
+type SearchableOption = {
+  value: string
+  label: string
+  helper?: string
+  searchText: string
+}
+
 const today = new Date().toISOString().slice(0, 10)
 
 const emptyForm: VisitForm = {
@@ -92,6 +100,110 @@ const statusClass = (estado: string) => {
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL')
 
+type SearchableSelectProps = {
+  label: string
+  value: string
+  placeholder: string
+  emptyLabel?: string
+  options: SearchableOption[]
+  onChange: (value: string) => void
+}
+
+const SearchableSelect = ({ label, value, placeholder, emptyLabel, options, onChange }: SearchableSelectProps) => {
+  const selectedOption = options.find(option => option.value === value)
+  const [query, setQuery] = useState(selectedOption?.label ?? '')
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    setQuery(selectedOption?.label ?? '')
+  }, [selectedOption?.label])
+
+  const normalizedQuery = query.trim().toLowerCase()
+  const visibleOptions = normalizedQuery
+    ? options.filter(option => option.searchText.includes(normalizedQuery)).slice(0, 8)
+    : options.slice(0, 8)
+
+  return (
+    <div className='relative text-sm font-semibold text-[#D9D9D9]'>
+      <span>{label}</span>
+      <div className='mt-1 flex h-11 items-center gap-2 rounded-lg border border-[#6f929b]/45 bg-[#173344]/75 px-3 text-white shadow-inner shadow-black/5 transition focus-within:border-[#9CBFC1] focus-within:bg-[#142f3f] focus-within:ring-2 focus-within:ring-[#9CBFC1]/15'>
+        <Search className='size-4 shrink-0 text-[#9CBFC1]' />
+        <input
+          type='text'
+          value={query}
+          onChange={event => {
+            setQuery(event.target.value)
+            setIsOpen(true)
+            if (value) onChange('')
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+          placeholder={placeholder}
+          className='min-w-0 flex-1 border-none !bg-transparent p-0 text-sm font-semibold text-white outline-none placeholder:text-[#9CBFC1]'
+          autoComplete='off'
+        />
+        {value ? (
+          <button
+            type='button'
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => {
+              onChange('')
+              setQuery('')
+              setIsOpen(true)
+            }}
+            className='rounded-md px-1.5 py-0.5 text-xs font-bold text-[#9CBFC1] hover:bg-white/10 hover:text-white'
+            aria-label={`Limpiar ${label.toLowerCase()}`}
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      {isOpen ? (
+        <div className='absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-[#9CBFC1]/25 bg-[#f8fafc] p-1.5 shadow-xl shadow-slate-950/25'>
+          {emptyLabel ? (
+            <button
+              type='button'
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                onChange('')
+                setQuery('')
+                setIsOpen(false)
+              }}
+              className={`block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition hover:bg-[#e7f1f2] ${
+                !value ? 'bg-[#d8e9ea] text-[#173344]' : 'text-[#36515d]'
+              }`}
+            >
+              {emptyLabel}
+            </button>
+          ) : null}
+          {visibleOptions.map(option => (
+            <button
+              key={option.value}
+              type='button'
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                onChange(option.value)
+                setQuery(option.label)
+                setIsOpen(false)
+              }}
+              className={`block w-full rounded-lg px-3 py-2 text-left transition hover:bg-[#e7f1f2] ${
+                value === option.value ? 'bg-[#d8e9ea]' : ''
+              }`}
+            >
+              <span className='block text-sm font-semibold text-[#173344]'>{option.label}</span>
+              {option.helper ? <span className='mt-0.5 block text-xs font-medium text-[#5b7380]'>{option.helper}</span> : null}
+            </button>
+          ))}
+          {visibleOptions.length === 0 ? (
+            <p className='px-3 py-3 text-sm font-medium text-[#5b7380]'>Sin resultados.</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 const AgendaPage = () => {
   const session = useCurrentUser()
   const canWrite = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
@@ -113,9 +225,46 @@ const AgendaPage = () => {
   const [successMsg, setSuccessMsg] = useState('')
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null)
 
+  const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('CALENDAR')
+  const [calendarVisits, setCalendarVisits] = useState<CalendarVisitRow[]>([])
+  const [googleCalendarStatus, setGoogleCalendarStatus] = useState<{ isConnected: boolean; syncEnabled: boolean } | null>(null)
+
   const patientById = useMemo(() => new Map(patients.map(patient => [patient.id, patient])), [patients])
   const professionalById = useMemo(() => new Map(professionals.map(professional => [professional.id, professional])), [professionals])
   const zoneById = useMemo(() => new Map(zones.map(zone => [zone.id, zone])), [zones])
+
+  const patientOptions = useMemo<SearchableOption[]>(() => patients.map(patient => {
+    const label = `${patient.nombres} ${patient.apellidos}`
+    const helper = patient.rut
+    return {
+      value: patient.id,
+      label,
+      helper,
+      searchText: `${label} ${helper}`.toLowerCase(),
+    }
+  }), [patients])
+
+  const professionalOptions = useMemo<SearchableOption[]>(() => professionals.map(professional => {
+    const label = professional.profesion
+    const helper = professional.numeroRegistro || 'Sin registro'
+    return {
+      value: professional.id,
+      label,
+      helper,
+      searchText: `${label} ${helper}`.toLowerCase(),
+    }
+  }), [professionals])
+
+  const zoneOptions = useMemo<SearchableOption[]>(() => zones.map(zone => {
+    const label = zone.nombre
+    const helper = `${zone.comuna}, ${zone.region}`
+    return {
+      value: zone.id,
+      label,
+      helper,
+      searchText: `${label} ${helper}`.toLowerCase(),
+    }
+  }), [zones])
 
   const loadData = () => {
     setIsLoading(true)
@@ -126,14 +275,27 @@ const AgendaPage = () => {
     if (fechaDesde) params.set('fechaDesde', fechaDesde)
     if (fechaHasta) params.set('fechaHasta', fechaHasta)
 
-    Promise.all([
+    const calParams = new URLSearchParams()
+    if (estadoFilter) calParams.set('estado', estadoFilter)
+    if (fechaDesde) calParams.set('desde', fechaDesde)
+    const calHasta = fechaHasta || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0, 10)
+    calParams.set('hasta', calHasta)
+
+    const promises: Promise<any>[] = [
       apiGet<VisitRow[]>(`/visitas${params.toString() ? `?${params.toString()}` : ''}`),
+      apiGet<CalendarVisitRow[]>(`/visitas/calendario${calParams.toString() ? `?${calParams.toString()}` : ''}`),
       apiGet<PatientRow[]>('/pacientes'),
       apiGet<ProfessionalRow[]>('/profesionales'),
       apiGet<ZoneRow[]>('/zonas'),
       apiGet<PrestacionRow[]>('/prestaciones?activa=true'),
-    ])
-      .then(async ([visitRows, patientRows, professionalRows, zoneRows, prestacionRows]) => {
+    ]
+
+    if (session.rol === 'PROFESIONAL') {
+      promises.push(apiGet('/google-calendar/status').catch(() => null))
+    }
+
+    Promise.all(promises)
+      .then(async ([visitRows, calRows, patientRows, professionalRows, zoneRows, prestacionRows, googleStatus]) => {
         const prestacionesEntries = await Promise.all(
           visitRows.map(async visit => {
             const rows = await apiGet<VisitPrestacionRow[]>(`/visitas/${visit.id}/prestaciones`)
@@ -142,6 +304,8 @@ const AgendaPage = () => {
         )
 
         setVisits(visitRows)
+        setCalendarVisits(calRows)
+        if (googleStatus) setGoogleCalendarStatus(googleStatus)
         setPatients(patientRows)
         setProfessionals(professionalRows.filter(professional => professional.activo))
         setZones(zoneRows.filter(zone => zone.activa))
@@ -307,125 +471,69 @@ const AgendaPage = () => {
               Programa visitas, asigna profesionales y controla el estado de la atención domiciliaria.
             </p>
           </div>
-          <button
-            type='button'
-            onClick={loadData}
-            className='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100'
-          >
-            <CalendarDays className='size-4' />
-            Actualizar agenda
-          </button>
+          <div className='flex items-center gap-3'>
+            {session.rol === 'PROFESIONAL' && googleCalendarStatus && (
+              <a
+                href={googleCalendarStatus.isConnected ? '#' : 'http://localhost:3000/google-calendar/connect'}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
+                  googleCalendarStatus.isConnected
+                    ? 'bg-emerald-100 text-emerald-800 cursor-default'
+                    : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <LinkIcon className='size-4' />
+                {googleCalendarStatus.isConnected ? 'Google Calendar Conectado' : 'Conectar Google Calendar'}
+              </a>
+            )}
+            <div className='flex items-center rounded-xl border border-slate-300 bg-white p-1 shadow-sm'>
+              <button
+                type='button'
+                onClick={() => setViewMode('CALENDAR')}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  viewMode === 'CALENDAR' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <CalendarIcon className='size-4' />
+                Calendario
+              </button>
+              <button
+                type='button'
+                onClick={() => setViewMode('LIST')}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  viewMode === 'LIST' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <List className='size-4' />
+                Lista
+              </button>
+            </div>
+            <button
+              type='button'
+              onClick={loadData}
+              className='inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800'
+            >
+              <RefreshCcw className='size-4' />
+              Actualizar
+            </button>
+          </div>
         </header>
 
         {error && <div className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{error}</div>}
         {successMsg && <div className='rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>{successMsg}</div>}
 
-        {canWrite ? (
-          <form onSubmit={handleSubmitVisit} className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-            <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
-              <div className='flex items-center gap-2'>
-                <CalendarDays className='size-5 text-[#3C6E71]' />
-                <h2 className='m-0 text-lg font-semibold text-slate-900'>
-                  {editingVisitId ? 'Editar visita' : 'Crear visita'}
-                </h2>
-              </div>
-              {editingVisitId ? (
-                <button type='button' onClick={resetVisitForm} className='rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50'>
-                  Cancelar edición
-                </button>
-              ) : null}
-            </div>
-            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-              <label className='text-sm font-semibold text-slate-700'>
-                Paciente
-                <select value={form.pacienteId} onChange={event => setForm(current => ({ ...current, pacienteId: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm'>
-                  <option value=''>Selecciona paciente</option>
-                  {patients.map(patient => (
-                    <option key={patient.id} value={patient.id}>{patient.nombres} {patient.apellidos} - {patient.rut}</option>
-                  ))}
-                </select>
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Profesional
-                <select value={form.profesionalSaludId} onChange={event => setForm(current => ({ ...current, profesionalSaludId: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm'>
-                  <option value=''>Selecciona profesional</option>
-                  {professionals.map(professional => (
-                    <option key={professional.id} value={professional.id}>{professional.profesion} · {professional.numeroRegistro || 'sin registro'}</option>
-                  ))}
-                </select>
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Zona
-                <select value={form.zonaId} onChange={event => setForm(current => ({ ...current, zonaId: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm'>
-                  <option value=''>Sin zona</option>
-                  {zones.map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.nombre} - {zone.comuna}</option>
-                  ))}
-                </select>
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Prioridad
-                <select value={form.prioridad} onChange={event => setForm(current => ({ ...current, prioridad: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm'>
-                  <option value='BAJA'>Baja</option>
-                  <option value='NORMAL'>Normal</option>
-                  <option value='ALTA'>Alta</option>
-                  <option value='URGENTE'>Urgente</option>
-                </select>
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Fecha
-                <input type='date' value={form.fechaProgramada} onChange={event => setForm(current => ({ ...current, fechaProgramada: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm' />
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Hora
-                <input type='time' value={form.horaProgramada} onChange={event => setForm(current => ({ ...current, horaProgramada: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm' />
-              </label>
-              <label className='text-sm font-semibold text-slate-700'>
-                Duración estimada
-                <input type='number' min='1' value={form.duracionEstimadaMin} onChange={event => setForm(current => ({ ...current, duracionEstimadaMin: event.target.value }))} className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm' />
-              </label>
-              <div className='flex items-end'>
-                <button type='submit' disabled={isSaving} className='w-full rounded-lg bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#284B63] disabled:opacity-60'>
-                  {isSaving ? 'Guardando...' : editingVisitId ? 'Actualizar visita' : 'Crear visita'}
-                </button>
-              </div>
-            </div>
-            <fieldset className='mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4'>
-              <legend className='px-1 text-sm font-semibold text-slate-800'>Prestaciones de la visita</legend>
-              <div className='mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
-                {prestaciones.map(prestacion => {
-                  const checked = form.prestacionIds.includes(prestacion.id)
-                  return (
-                    <label key={prestacion.id} className='flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700'>
-                      <input
-                        type='checkbox'
-                        checked={checked}
-                        onChange={event => setForm(current => ({
-                          ...current,
-                          prestacionIds: event.target.checked
-                            ? [...current.prestacionIds, prestacion.id]
-                            : current.prestacionIds.filter(id => id !== prestacion.id),
-                        }))}
-                        className='mt-1 size-4 rounded border-slate-300 text-[#3C6E71] focus:ring-[#3C6E71]/20'
-                      />
-                      <span>
-                        <span className='block font-semibold text-slate-800'>{prestacion.nombre}</span>
-                        <span className='text-xs text-slate-500'>
-                          {prestacion.duracionEstimadaMin ? `${prestacion.duracionEstimadaMin} min` : 'Sin duración estimada'}
-                        </span>
-                      </span>
-                    </label>
-                  )
-                })}
-                {prestaciones.length === 0 ? (
-                  <p className='text-sm text-slate-500'>No hay prestaciones activas disponibles.</p>
-                ) : null}
-              </div>
-            </fieldset>
-          </form>
-        ) : null}
-
-        <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+        {/* VISTAS */}
+        {viewMode === 'CALENDAR' ? (
+          <CalendarView
+            visits={calendarVisits}
+            onSelectVisit={(visit) => {
+              if (canWrite) {
+                const found = visits.find(v => v.id === visit.id)
+                if (found) handleEdit(found)
+              }
+            }}
+          />
+        ) : (
+          <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
           <div className='mb-4 grid gap-3 md:grid-cols-4'>
             <div className='flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 md:col-span-2'>
               <Search className='size-4 text-slate-500' />
@@ -530,6 +638,119 @@ const AgendaPage = () => {
             </table>
           </div>
         </section>
+        )}
+
+        {canWrite ? (
+          <form onSubmit={handleSubmitVisit} className='rounded-xl border border-[#9CBFC1]/35 bg-[#203C50]/92 p-6 shadow-xl shadow-black/10'>
+            <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
+              <div className='flex items-center gap-2'>
+                <CalendarDays className='size-5 text-[#9CBFC1]' />
+                <h2 className='m-0 text-lg font-semibold text-white'>
+                  {editingVisitId ? 'Editar visita' : 'Crear visita'}
+                </h2>
+              </div>
+              {editingVisitId ? (
+                <button type='button' onClick={resetVisitForm} className='rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50'>
+                  Cancelar edición
+                </button>
+              ) : null}
+            </div>
+            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+              <SearchableSelect
+                label='Paciente'
+                value={form.pacienteId}
+                placeholder='Buscar paciente por nombre o RUT'
+                options={patientOptions}
+                onChange={pacienteId => setForm(current => ({ ...current, pacienteId }))}
+              />
+              <SearchableSelect
+                label='Profesional'
+                value={form.profesionalSaludId}
+                placeholder='Buscar profesional o registro'
+                options={professionalOptions}
+                onChange={profesionalSaludId => setForm(current => ({ ...current, profesionalSaludId }))}
+              />
+              <SearchableSelect
+                label='Zona'
+                value={form.zonaId}
+                placeholder='Buscar zona o comuna'
+                emptyLabel='Sin zona'
+                options={zoneOptions}
+                onChange={zonaId => setForm(current => ({ ...current, zonaId }))}
+              />
+              <label className='text-sm font-semibold text-[#D9D9D9]'>
+                Prioridad
+                <select value={form.prioridad} onChange={event => setForm(current => ({ ...current, prioridad: event.target.value }))} className='mt-1 h-11 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm font-semibold text-white shadow-inner shadow-black/5 transition focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15'>
+                  <option value='BAJA'>Baja</option>
+                  <option value='NORMAL'>Normal</option>
+                  <option value='ALTA'>Alta</option>
+                  <option value='URGENTE'>Urgente</option>
+                </select>
+              </label>
+              <label className='text-sm font-semibold text-[#D9D9D9]'>
+                Fecha
+                <input type='date' value={form.fechaProgramada} onChange={event => setForm(current => ({ ...current, fechaProgramada: event.target.value }))} className='mt-1 h-11 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm font-semibold text-white shadow-inner shadow-black/5 transition focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15' />
+              </label>
+              <label className='text-sm font-semibold text-[#D9D9D9]'>
+                Hora
+                <input type='time' value={form.horaProgramada} onChange={event => setForm(current => ({ ...current, horaProgramada: event.target.value }))} className='mt-1 h-11 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm font-semibold text-white shadow-inner shadow-black/5 transition focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15' />
+              </label>
+              <label className='text-sm font-semibold text-[#D9D9D9]'>
+                Duración estimada
+                <input type='number' min='1' value={form.duracionEstimadaMin} onChange={event => setForm(current => ({ ...current, duracionEstimadaMin: event.target.value }))} className='mt-1 h-11 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm font-semibold text-white shadow-inner shadow-black/5 transition focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15' />
+              </label>
+              <div className='flex items-end'>
+                <button type='submit' disabled={isSaving} className='h-11 w-full rounded-lg bg-[#4c8587] px-4 text-sm font-bold text-white shadow-sm shadow-black/10 transition hover:bg-[#5b999b] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/30 disabled:opacity-60'>
+                  {isSaving ? 'Guardando...' : editingVisitId ? 'Actualizar visita' : 'Crear visita'}
+                </button>
+              </div>
+            </div>
+            <fieldset className='mt-6 rounded-xl border border-[#9CBFC1]/28 bg-[#173344]/45 p-4'>
+              <legend className='px-1 text-sm font-semibold text-white'>Prestaciones de la visita</legend>
+              <div className='mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
+                {prestaciones.map(prestacion => {
+                  const checked = form.prestacionIds.includes(prestacion.id)
+                  return (
+                    <label key={prestacion.id} className={`group flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition ${
+                      checked
+                        ? 'border-[#9CBFC1]/75 bg-[#3C6E71]/28 shadow-sm shadow-black/10'
+                        : 'border-[#9CBFC1]/24 bg-[#203C50]/65 hover:border-[#9CBFC1]/55 hover:bg-[#284B63]/55'
+                    }`}>
+                      <input
+                        type='checkbox'
+                        checked={checked}
+                        onChange={event => setForm(current => ({
+                          ...current,
+                          prestacionIds: event.target.checked
+                            ? [...current.prestacionIds, prestacion.id]
+                            : current.prestacionIds.filter(id => id !== prestacion.id),
+                        }))}
+                        className='peer sr-only'
+                      />
+                      <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border transition ${
+                        checked
+                          ? 'border-[#9CBFC1] bg-[#9CBFC1] text-[#173344]'
+                          : 'border-[#9CBFC1]/65 bg-[#173344] text-transparent group-hover:border-[#D9D9D9]'
+                      }`}>
+                        <span className='text-sm font-black leading-none'>✓</span>
+                      </span>
+                      <span>
+                        <span className='block font-semibold text-white'>{prestacion.nombre}</span>
+                        <span className='text-xs font-medium text-[#D9D9D9]'>
+                          {prestacion.duracionEstimadaMin ? `${prestacion.duracionEstimadaMin} min` : 'Sin duración estimada'}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+                {prestaciones.length === 0 ? (
+                  <p className='text-sm text-slate-500'>No hay prestaciones activas disponibles.</p>
+                ) : null}
+              </div>
+            </fieldset>
+          </form>
+        ) : null}
+
       </section>
     </main>
   )
