@@ -1,100 +1,115 @@
 import React from 'react';
-import { View, ViewStyle, FlexStyle, StyleProp, DimensionValue } from 'react-native';
+import { View, ViewStyle, StyleProp } from 'react-native';
 import { theme } from '../theme';
 
 interface LayoutProps {
-  children?: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
   flex?: number;
-  padding?: keyof typeof theme.spacing | number;
-  margin?: keyof typeof theme.spacing | number;
-  gap?: keyof typeof theme.spacing | number;
-  align?: FlexStyle['alignItems'];
-  justify?: FlexStyle['justifyContent'];
-  width?: DimensionValue;
+  gap?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  align?: 'flex-start' | 'center' | 'flex-end' | 'stretch';
+  justify?:
+    | 'flex-start'
+    | 'center'
+    | 'flex-end'
+    | 'space-between'
+    | 'space-around';
   bg?: string;
-  radius?: keyof typeof theme.borderRadius | number;
+  style?: StyleProp<ViewStyle>;
 }
 
-const getSpacingVal = (val: any) => {
-  if (typeof val === 'string' && val in theme.spacing) {
-    return theme.spacing[val as keyof typeof theme.spacing];
-  }
-  return val;
+const gapMap: Record<string, number> = {
+  xs: theme.spacing.xs,
+  sm: theme.spacing.sm,
+  md: theme.spacing.md,
+  lg: theme.spacing.lg,
+  xl: theme.spacing.xl,
 };
 
-const getRadiusVal = (val: any) => {
-  if (typeof val === 'string' && val in theme.borderRadius) {
-    return theme.borderRadius[val as keyof typeof theme.borderRadius];
-  }
-  return val;
-};
-
-// 1. Box: Contenedor genérico que traduce propiedades CSS básicas
-export const Box: React.FC<LayoutProps> = ({
+export function VStack({
   children,
-  style,
   flex,
-  padding,
-  margin,
+  gap,
   align,
   justify,
-  width,
   bg,
-  radius,
-}) => {
-  const dynamicStyles: ViewStyle = {
-    flex,
-    padding: getSpacingVal(padding),
-    margin: getSpacingVal(margin),
-    alignItems: align,
-    justifyContent: justify,
-    width,
-    backgroundColor: bg,
-    borderRadius: getRadiusVal(radius),
-  };
-
-  return <View style={[dynamicStyles, style]}>{children}</View>;
-};
-
-// 2. VStack: Pila vertical con espaciado uniforme automático
-export const VStack: React.FC<LayoutProps> = ({
-  children,
   style,
-  gap,
-  ...props
-}) => {
+}: LayoutProps) {
   return (
-    <Box
+    <View
       style={[
-        { flexDirection: 'column' },
-        gap ? { gap: getSpacingVal(gap) } : undefined,
-        style
+        {
+          flex,
+          flexDirection: 'column',
+          gap: gap ? gapMap[gap] : undefined,
+          alignItems: align,
+          justifyContent: justify,
+          backgroundColor: bg,
+        },
+        style,
       ]}
-      {...props}
     >
       {children}
-    </Box>
+    </View>
   );
-};
+}
 
-// 3. HStack: Pila horizontal (Fila) con espaciado uniforme automático
-export const HStack: React.FC<LayoutProps> = ({
+export function HStack({
   children,
-  style,
+  flex,
   gap,
-  ...props
-}) => {
+  align,
+  justify,
+  bg,
+  style,
+}: LayoutProps) {
   return (
-    <Box
+    <View
       style={[
-        { flexDirection: 'row' },
-        gap ? { gap: getSpacingVal(gap) } : undefined,
-        style
+        {
+          flex,
+          flexDirection: 'row',
+          gap: gap ? gapMap[gap] : undefined,
+          alignItems: align,
+          justifyContent: justify,
+          backgroundColor: bg,
+        },
+        style,
       ]}
-      {...props}
     >
       {children}
-    </Box>
+    </View>
   );
+}
+
+interface BoxProps {
+  children?: React.ReactNode;
+  flex?: number;
+  p?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  bg?: string;
+  radius?: 'sm' | 'md' | 'lg';
+  style?: StyleProp<ViewStyle>;
+}
+
+const radiusMap: Record<string, number> = {
+  sm: theme.radius.sm,
+  md: theme.radius.md,
+  lg: theme.radius.lg,
 };
+
+export function Box({ children, flex, p, bg, radius, style }: BoxProps) {
+  return (
+    <View
+      style={[
+        {
+          flex,
+          padding: p ? gapMap[p] : undefined,
+          backgroundColor: bg,
+          borderRadius: radius ? radiusMap[radius] : undefined,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
