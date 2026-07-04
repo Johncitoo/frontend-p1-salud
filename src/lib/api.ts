@@ -4,9 +4,28 @@ import { getValidKeycloakToken } from '@/features/auth/keycloak'
 const DEFAULT_API_URL = 'http://localhost:3000'
 export const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL
 
+const FETCH_TIMEOUT_MS = 30_000 // 30 seconds
+
 type ApiError = Error & {
   status?: number
   payload?: unknown
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('La solicitud excedió el tiempo de espera')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 async function parseApiResponse<TResponse>(response: Response): Promise<TResponse> {
@@ -42,8 +61,40 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   }
 }
 
+export async function apiPostForm<TResponse>(
+  path: string,
+  body: FormData,
+): Promise<TResponse> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body,
+  })
+
+  return parseApiResponse<TResponse>(response)
+}
+
+export async function apiGetBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+    headers: await getAuthHeaders(),
+  })
+
+  if (!response.ok) {
+    await parseApiResponse<never>(response)
+  }
+
+  const disposition = response.headers.get('content-disposition') ?? ''
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i)
+  const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : 'documento'
+
+  return {
+    blob: await response.blob(),
+    filename,
+  }
+}
+
 export async function apiGet<TResponse>(path: string): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     headers: await getAuthHeaders(),
   })
 
@@ -54,7 +105,7 @@ export async function apiPost<TResponse, TBody>(
   path: string,
   body: TBody,
 ): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -70,7 +121,7 @@ export async function apiPatch<TResponse, TBody>(
   path: string,
   body: TBody,
 ): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -83,7 +134,7 @@ export async function apiPatch<TResponse, TBody>(
 }
 
 export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
     headers: await getAuthHeaders(),
   })

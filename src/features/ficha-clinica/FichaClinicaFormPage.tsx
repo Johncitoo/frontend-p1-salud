@@ -19,6 +19,7 @@ import {
   validateDynamicFields,
 } from './fichaFormUtils'
 import { clearDraft, readDraft, saveDraft } from './draftStorage'
+import FichaAdjuntosPanel from './FichaAdjuntosPanel'
 
 // ============================================================
 const fieldClassName =
@@ -722,6 +723,8 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
             </>
           )}
         </form>
+
+        <FichaAdjuntosPanel fichaClinicaId={effectiveFichaId} isClosed={isClosed} />
       </section>
     </main>
   )
