@@ -12,6 +12,7 @@ import ZonesListPage from './features/zones/ZonesListPage'
 import ProfessionalsPage from './features/professionals/ProfessionalsPage'
 import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
+import CrmTicketsListPage from './features/crm/CrmTicketsListPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
 import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
@@ -163,6 +164,7 @@ function App() {
     if (professionalEditMatch) return <ProfessionalsPage editId={professionalEditMatch[1]} />
 
     if (pathname === '/audit') return <AuditPage />
+    if (pathname === '/incidents') return <CrmTicketsListPage />
 
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />
