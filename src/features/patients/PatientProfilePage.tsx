@@ -84,7 +84,7 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
     setIsSubmitting(true)
     try {
       await apiPost('/iot/paciente-sensores', {
-        pacienteId,
+        pacienteId: patientId,
         assetId,
         sensorId,
         sensorType,
