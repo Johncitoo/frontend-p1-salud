@@ -11,6 +11,7 @@ import {
   Stethoscope,
   UserCog,
   Users,
+  AlertTriangle,
 } from 'lucide-react'
 
 import { useAuthSession, type AppRole } from '@/features/auth/AuthSessionContext'
@@ -32,6 +33,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Incidentes', href: '/incidents', icon: <AlertTriangle className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 

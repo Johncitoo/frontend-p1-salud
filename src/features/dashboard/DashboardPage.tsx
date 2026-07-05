@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   ArrowUpRight,
   BriefcaseMedical,
@@ -11,9 +12,11 @@ import {
   Stethoscope,
   UserCog,
   Users,
+  AlertTriangle,
 } from 'lucide-react'
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
+import { apiGet } from '@/lib/api'
 
 type NavCard = {
   title: string
@@ -37,9 +40,33 @@ const cards: NavCard[] = [
   { title: 'Auditoría', description: 'Revisa eventos y trazabilidad.', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
+type AlertaRow = {
+  id: string
+  tipo: string
+  mensaje: string
+  prioridad: string
+  estado: string
+  createdAt: string
+  pacienteId: string
+}
+
 const DashboardPage = () => {
   const session = useCurrentUser()
   const filteredCards = cards.filter(card => card.roles.includes(session.rol))
+  const [alertas, setAlertas] = useState<AlertaRow[]>([])
+
+  useEffect(() => {
+    let isMounted = true
+    if (session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'PROFESIONAL') {
+      apiGet<AlertaRow[]>('/alertas').then(data => {
+        if (isMounted) {
+          // Filtrar alertas IoT
+          setAlertas(data.filter(a => a.tipo.startsWith('IOT_') && a.estado !== 'CERRADA' && a.estado !== 'RESUELTA'))
+        }
+      }).catch(console.error)
+    }
+    return () => { isMounted = false }
+  }, [session.rol])
 
   return (
     <main className='min-h-screen bg-[#182F3F] px-4 py-5 sm:px-6 sm:py-7 xl:px-10 xl:py-9'>
@@ -146,6 +173,31 @@ const DashboardPage = () => {
             ))}
           </div>
         </section>
+
+        {alertas.length > 0 && (
+          <section className='mt-8 rounded-[24px] border border-amber-200 bg-amber-50 p-6'>
+            <div className='flex items-center gap-3 mb-4'>
+              <AlertTriangle className='text-amber-600 size-6' />
+              <h2 className='text-xl font-semibold text-amber-900'>Alertas Domiciliarias (IoT) Activas</h2>
+            </div>
+            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+              {alertas.map(alerta => (
+                <div key={alerta.id} className='bg-white rounded-xl p-4 shadow-sm border border-amber-100 flex flex-col justify-between'>
+                  <div>
+                    <span className='px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold uppercase rounded-md'>
+                      Prioridad {alerta.prioridad}
+                    </span>
+                    <p className='mt-3 text-sm font-semibold text-slate-800'>{alerta.mensaje}</p>
+                  </div>
+                  <div className='mt-4 flex items-center justify-between'>
+                    <span className='text-xs text-slate-500'>{new Date(alerta.createdAt).toLocaleString('es-CL')}</span>
+                    <a href={`/patients/${alerta.pacienteId}`} className='text-xs font-semibold text-[#3C6E71] hover:underline'>Ver paciente</a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </section>
     </main>
   )

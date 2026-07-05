@@ -5,6 +5,7 @@ import LoginPage from './features/auth/LoginPage'
 import DashboardPage from './features/dashboard/DashboardPage'
 import PatientsListPage from './features/patients/PatientsListPage'
 import PatientRegistrationPage from './features/patients/PatientRegistrationPage'
+import PatientProfilePage from './features/patients/PatientProfilePage'
 import UserFormPage from './features/users/UserFormPage'
 import UsersListPage from './features/users/UsersListPage'
 import ZoneFormPage from './features/zones/ZoneFormPage'
@@ -12,6 +13,7 @@ import ZonesListPage from './features/zones/ZonesListPage'
 import ProfessionalsPage from './features/professionals/ProfessionalsPage'
 import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
+import CrmTicketsListPage from './features/crm/CrmTicketsListPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
 import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
@@ -146,6 +148,8 @@ function App() {
 
     if (pathname === '/patients') return <PatientsListPage />
     if (pathname === '/patients/new') return <PatientRegistrationPage />
+    const patientViewMatch = pathname.match(/^\/patients\/([^/]+)$/)
+    if (patientViewMatch && patientViewMatch[1] !== 'new') return <PatientProfilePage patientId={patientViewMatch[1]} />
     if (pathname === '/agenda' || pathname === '/visitas') return <AgendaPage />
 
     if (pathname === '/users') return <UsersListPage />
@@ -163,6 +167,7 @@ function App() {
     if (professionalEditMatch) return <ProfessionalsPage editId={professionalEditMatch[1]} />
 
     if (pathname === '/audit') return <AuditPage />
+    if (pathname === '/incidents') return <CrmTicketsListPage />
 
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />

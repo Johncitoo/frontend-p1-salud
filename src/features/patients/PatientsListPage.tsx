@@ -131,8 +131,12 @@ const PatientsListPage = () => {
               )}
 
               {filteredPatients.map(patient => (
-                <tr key={patient.id} className='border-t border-slate-200 text-slate-800 transition hover:bg-slate-100'>
-                  <td className='px-4 py-3 font-medium'>{patient.rut}</td>
+                <tr 
+                  key={patient.id} 
+                  onClick={() => window.location.href = `/patients/${patient.id}`}
+                  className='border-t border-slate-200 text-slate-800 transition hover:bg-slate-100 cursor-pointer'
+                >
+                  <td className='px-4 py-3 font-medium text-[#284B63] hover:underline'>{patient.rut}</td>
                   <td className='px-4 py-3'>{patient.nombres}</td>
                   <td className='px-4 py-3'>{patient.apellidos}</td>
                   <td className='px-4 py-3'>{formatDate(patient.fechaNacimiento)}</td>
