@@ -140,18 +140,18 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
             </div>
             
             {devices.length === 0 ? (
-              <div className='bg-slate-50 rounded-xl p-4 border border-slate-200 text-center'>
-                <p className='text-sm text-slate-500'>No hay dispositivos vinculados.</p>
+              <div className='bg-black/10 rounded-xl p-4 border border-slate-600/30 text-center'>
+                <p className='text-sm text-slate-400'>No hay dispositivos vinculados.</p>
               </div>
             ) : (
               <div className='space-y-3'>
                 {devices.map(dev => (
-                  <div key={dev.id} className='bg-[#F4F9F9] rounded-xl p-4 border border-[#CDE7EA] flex justify-between items-center'>
+                  <div key={dev.id} className='bg-black/10 rounded-xl p-4 border border-slate-600/30 flex justify-between items-center'>
                     <div>
-                      <p className='text-sm text-slate-800 font-bold'>{dev.sensorType.toUpperCase()}</p>
-                      <p className='text-xs text-slate-500 mt-1'>Asset: {dev.assetId} | Sensor: {dev.sensorId}</p>
+                      <p className='text-sm text-slate-200 font-bold'>{dev.sensorType.toUpperCase()}</p>
+                      <p className='text-xs text-slate-400 mt-1'>Asset: {dev.assetId} | Sensor: {dev.sensorId}</p>
                     </div>
-                    <span className='px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold uppercase rounded-md'>
+                    <span className='px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-bold uppercase rounded-md border border-green-500/30'>
                       Activo
                     </span>
                   </div>
