@@ -1,15 +1,18 @@
-import { api } from '@/lib/api'
+import { apiGet } from '@/lib/api'
 import type { CrmTicket, CrmExternalStatus } from './types'
 
 export const getCrmTickets = async (params?: {
   estado?: string
   severidad?: string
 }) => {
-  const { data } = await api.get<CrmTicket[]>('/incidentes-salud', { params })
-  return data
+  const query = new URLSearchParams()
+  if (params?.estado) query.append('estado', params.estado)
+  if (params?.severidad) query.append('severidad', params.severidad)
+  
+  const qString = query.toString()
+  return await apiGet<CrmTicket[]>(`/incidentes-salud${qString ? `?${qString}` : ''}`)
 }
 
 export const getCrmTicketExternalStatus = async (id: string) => {
-  const { data } = await api.get<CrmExternalStatus>(`/incidentes-salud/externo/${id}`)
-  return data
+  return await apiGet<CrmExternalStatus>(`/incidentes-salud/externo/${id}`)
 }
