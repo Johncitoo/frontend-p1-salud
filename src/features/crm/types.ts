@@ -17,8 +17,18 @@ export interface CrmTicket {
 
 export interface CrmExternalStatus {
   id: string
+  externalIncidentId?: string | null
+  saludRef?: string
   titulo: string
-  descripcion: string
+  descripcion?: string | null
   estado: string
   severidad: string
+  canal?: string
+  clienteNombre?: string
+  resolucion?: string | null
+  fechaVencimientoSla?: string | null
+  creadoEn?: string
+  actualizadoEn?: string
+  sincronizado: boolean
+  mensaje?: string
 }
