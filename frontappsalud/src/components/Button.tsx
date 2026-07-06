@@ -3,7 +3,7 @@ import {
   TouchableOpacity,
   Text,
   TouchableOpacityProps,
-  View,
+  ActivityIndicator,
 } from 'react-native';
 import { theme } from '../theme';
 
@@ -11,17 +11,21 @@ interface ButtonProps extends TouchableOpacityProps {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outline';
   fullWidth?: boolean;
+  isLoading?: boolean;
 }
 
 export function PrimaryButton({
   children,
   fullWidth,
+  isLoading,
+  disabled,
   style,
   ...props
 }: ButtonProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      disabled={disabled || isLoading}
       style={[
         {
           backgroundColor: theme.colors.yaleBlue,
@@ -31,20 +35,25 @@ export function PrimaryButton({
           alignItems: 'center',
           justifyContent: 'center',
           width: fullWidth ? '100%' : undefined,
+          opacity: disabled || isLoading ? 0.7 : 1,
         },
         style,
       ]}
       {...props}
     >
-      <Text
-        style={{
-          color: theme.colors.white,
-          fontSize: theme.fontSize.subtitle,
-          fontWeight: '600',
-        }}
-      >
-        {children}
-      </Text>
+      {isLoading ? (
+        <ActivityIndicator color={theme.colors.white} />
+      ) : (
+        <Text
+          style={{
+            color: theme.colors.white,
+            fontSize: theme.fontSize.subtitle,
+            fontWeight: '600',
+          }}
+        >
+          {children}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -52,12 +61,15 @@ export function PrimaryButton({
 export function SecondaryButton({
   children,
   fullWidth,
+  isLoading,
+  disabled,
   style,
   ...props
 }: ButtonProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      disabled={disabled || isLoading}
       style={[
         {
           backgroundColor: theme.colors.white,
@@ -69,20 +81,25 @@ export function SecondaryButton({
           borderWidth: 1,
           borderColor: theme.colors.stormyTeal,
           width: fullWidth ? '100%' : undefined,
+          opacity: disabled || isLoading ? 0.7 : 1,
         },
         style,
       ]}
       {...props}
     >
-      <Text
-        style={{
-          color: theme.colors.stormyTeal,
-          fontSize: theme.fontSize.subtitle,
-          fontWeight: '600',
-        }}
-      >
-        {children}
-      </Text>
+      {isLoading ? (
+        <ActivityIndicator color={theme.colors.stormyTeal} />
+      ) : (
+        <Text
+          style={{
+            color: theme.colors.stormyTeal,
+            fontSize: theme.fontSize.subtitle,
+            fontWeight: '600',
+          }}
+        >
+          {children}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -90,12 +107,15 @@ export function SecondaryButton({
 export function OutlineButton({
   children,
   fullWidth,
+  isLoading,
+  disabled,
   style,
   ...props
 }: ButtonProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      disabled={disabled || isLoading}
       style={[
         {
           backgroundColor: 'transparent',
@@ -107,19 +127,24 @@ export function OutlineButton({
           borderWidth: 1.5,
           borderColor: theme.colors.alabasterGrey,
           width: fullWidth ? '100%' : undefined,
+          opacity: disabled || isLoading ? 0.7 : 1,
         },
         style,
       ]}
       {...props}
     >
-      <Text
-        style={{
-          color: theme.colors.stormyTeal,
-          fontSize: theme.fontSize.body,
-        }}
-      >
-        {children}
-      </Text>
+      {isLoading ? (
+        <ActivityIndicator color={theme.colors.stormyTeal} />
+      ) : (
+        <Text
+          style={{
+            color: theme.colors.stormyTeal,
+            fontSize: theme.fontSize.body,
+          }}
+        >
+          {children}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }

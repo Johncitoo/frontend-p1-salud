@@ -23,6 +23,7 @@ export const theme = {
     sm: 6,
     md: 10,
     lg: 16,
+    round: 999,
   },
   fontSize: {
     caption: 11,

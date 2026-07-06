@@ -6,6 +6,8 @@ import { Label } from '../components/Label';
 import { FormInput } from '../components/Input';
 import { PrimaryButton, SecondaryButton, OutlineButton } from '../components/Button';
 import { ArrowLeft, MapPin, ClipboardList, CheckSquare, Camera, Check, PenTool } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { syncService } from '../services/syncService';
 
 // Catálogo de Plantillas Clínicas Simuladas (Configurable / Dinámicas)
 const MOCK_PLANTILLAS = [
@@ -67,114 +69,25 @@ const MOCK_PROTOCOLOS: Record<string, string[]> = {
   ]
 };
 
-// Datos clínicos históricos para simular la ficha de pacientes
-const MOCK_DETALLES_PACIENTES: Record<string, any> = {
-  "v1": {
-    rut: "12.345.678-9",
-    edad: "68 años",
-    sexo: "Masculino",
-    prevision: "Fonasa B",
-    cuidador: "María Gómez (Hija) - +56 9 8888 7777",
-    referencia: "Casa esquina reja negra, frente al almacén Don Juan",
-    historial: [
-      { fecha: "05/06/2026", profesional: "Enf. Ana Jara", notas: "Presión estable. Curación de herida operatoria en muslo derecho limpia, sin signos de infección. Se retiran 3 puntos." },
-      { fecha: "01/06/2026", profesional: "Dr. Carlos Torres", notas: "Ingreso a hospitalización domiciliaria. Paciente post-operado de cadera. Se indica curación cada 4 días y control de parámetros." }
-    ],
-    plan_cuidado: {
-      diagnostico: "Post-operado prótesis de cadera derecha",
-      objetivo: "Lograr bipedestación segura, curación total de herida operatoria y control del dolor posquirúrgico.",
-      frecuencia: "Visitas 3 veces por semana"
-    }
-  },
-  "v2": {
-    rut: "9.876.543-2",
-    edad: "74 años",
-    sexo: "Femenino",
-    prevision: "Isapre Banmédica",
-    cuidador: "Roberto Soto (Esposo) - +56 9 7777 6666",
-    referencia: "Block B, Depto 402. Tocar timbre 402 en la entrada principal",
-    historial: [
-      { fecha: "08/06/2026", profesional: "Kin. Luis Rivas", notas: "Ejercicios respiratorios tolerados adecuadamente. Saturación basal 93%. Se educa sobre uso de inhalador." },
-      { fecha: "04/06/2026", profesional: "Dr. Carlos Torres", notas: "Exacerbación de EPOC. Paciente requiere oxigenoterapia domiciliaria intermitente y kinesioterapia respiratoria diaria." }
-    ],
-    plan_cuidado: {
-      diagnostico: "EPOC reagudizado + Oxigenodependiente",
-      objetivo: "Optimizar patrón ventilatorio, mejorar saturación de oxígeno a >94% con apoyo y evitar reingreso hospitalario.",
-      frecuencia: "Kinesiólogo diario, Médico semanal"
-    },
-    esFragil: true
-  },
-  "v3": {
-    rut: "15.678.901-k",
-    edad: "55 años",
-    sexo: "Masculino",
-    prevision: "Fonasa A",
-    cuidador: "Patricia Díaz (Esposa) - +56 9 5555 4444",
-    referencia: "Casa interior al fondo del pasillo compartido. Tocar portón de madera.",
-    historial: [
-      { fecha: "07/06/2026", profesional: "Enf. Ana Jara", notas: "Tercera dosis de antibiótico endovenoso administrada sin incidentes. Vía venosa periférica permeable en antebrazo izquierdo." }
-    ],
-    plan_cuidado: {
-      diagnostico: "Celulitis en extremidad inferior izquierda",
-      objetivo: "Completar esquema antibiótico endovenoso de 7 días, reducir eritema y edema en pierna afectada.",
-      frecuencia: "Visita diaria para administración EV"
-    }
-  },
-  "v4": {
-    rut: "7.654.321-0",
-    edad: "82 años",
-    sexo: "Femenino",
-    prevision: "Dipreca",
-    cuidador: "Juana Rojas (Hermana) - +56 9 3333 2222",
-    referencia: "Frente a plaza de juegos. Portón blanco con plantas colgantes.",
-    historial: [
-      { fecha: "03/06/2026", profesional: "Dr. Carlos Torres", notas: "Control de rutina. Se ajustan dosis de antihipertensivos por episodios leves de hipotensión ortostática." }
-    ],
-    plan_cuidado: {
-      diagnostico: "Hipertensión Arterial Severa + Demencia Senil leve",
-      objetivo: "Mantener cifras tensionales en rangos seguros, conciliar pauta de medicamentos diaria y vigilar estados cognitivos.",
-      frecuencia: "Control médico mensual"
-    },
-    esFragil: true
-  }
+// Alergias y medicación actual: backend-p1-salud no tiene ninguna entidad para esto
+// todavía (ni endpoint ni columna en Paciente), así que no hay dato real que mostrar.
+// En vez de fabricar contenido por paciente, se muestra siempre este aviso honesto.
+const SIN_DATOS_ALERGIAS_MEDICACION = {
+  alergias: ["Sin datos disponibles: el backend aún no registra alergias por paciente."],
+  actuales: ["Sin datos disponibles: el backend aún no registra medicación por paciente."],
 };
 
-// Datos adicionales: Alergias y Medicación actual
-const MOCK_MEDICACION_PACIENTES: Record<string, { alergias: string[]; actuales: string[] }> = {
-  "v1": {
-    alergias: ["Penicilina (Reacción de urticaria severa)", "Aspirina (Broncoespasmo inducido por AINEs)"],
-    actuales: [
-      "Losartán 50mg - 1 tableta cada 12 horas VO", 
-      "Atorvastatina 20mg - 1 tableta en la noche VO", 
-      "Tramadol 50mg - 1 tableta cada 8 horas VO (si hay dolor severo)"
-    ]
-  },
-  "v2": {
-    alergias: ["Sulfas (Historial de shock anafiláctico)", "Dipirona / Metamizol (Reacción alérgica grave)"],
-    actuales: [
-      "Bromuro de Ipratropio inhalador - 2 pufs cada 6 horas", 
-      "Fluticasona inhalador - 2 pufs cada 12 horas", 
-      "Prednisona 5mg - 1 tableta en la mañana VO", 
-      "Omeprazol 20mg - 1 cápsula en ayunas VO"
-    ]
-  },
-  "v3": {
-    alergias: ["Sin alergias medicamentosas conocidas (NKDA)"],
-    actuales: [
-      "Cloxacilina 500mg - 1 tableta cada 6 horas VO (iniciar al terminar tratamiento endovenoso)", 
-      "Paracetamol 1g - 1 tableta cada 8 horas VO (en caso de dolor o fiebre)"
-    ]
-  },
-  "v4": {
-    alergias: ["Medios de Contraste Yodados (Historial de shock leve)"],
-    actuales: [
-      "Enalapril 10mg - 1 tableta cada 12 horas VO", 
-      "Amlodipino 5mg - 1 tableta en la mañana VO", 
-      "Quetiapina 25mg - 1 tableta en la noche VO", 
-      "Sertralina 50mg - 1 tableta en la mañana VO"
-    ]
-  }
-};
+function calcularEdad(fechaNacimiento?: string | null): string {
+  if (!fechaNacimiento) return "N/A";
+  const nacimiento = new Date(fechaNacimiento);
+  if (isNaN(nacimiento.getTime())) return "N/A";
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const aunNoCumple = hoy.getMonth() < nacimiento.getMonth()
+    || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+  if (aunNoCumple) edad--;
+  return `${edad} años`;
+}
 
 interface VisitDetailScreenProps {
   visita: any;
@@ -203,7 +116,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
   // Plantillas dinámicas provenientes del backend
   const templatesList = plantillas && plantillas.length > 0 ? plantillas : MOCK_PLANTILLAS;
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  
+
   useEffect(() => {
     if (templatesList && templatesList.length > 0 && !selectedTemplateId) {
       setSelectedTemplateId(templatesList[0].id);
@@ -216,16 +129,30 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
   // Diccionario dinámico para guardar las respuestas del formulario de la ficha activa
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [observaciones, setObservaciones] = useState("");
-  
+
   // Checklist de protocolos clínicos
   const [protocolChecked, setProtocolChecked] = useState<Record<number, boolean>>({});
-  
+
   // Checklist de prestaciones y fotos
   const [prestacionCompletada, setPrestacionCompletada] = useState(false);
   const [currentFotoUrl, setCurrentFotoUrl] = useState<string | null>(null);
+  const [currentFotoMimeType, setCurrentFotoMimeType] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReadingSensor, setIsReadingSensor] = useState(false);
+
+  // Detalle real del paciente (dirección/referencia, cuidador, plan de cuidado,
+  // historial de mediciones), traído de backend-p1-salud. Reemplaza el mock anterior.
+  const [detallePaciente, setDetallePaciente] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!visita.pacienteId) return;
+    syncService.obtenerDetallePaciente(visita.pacienteId)
+      .then(detalle => { if (!cancelado) setDetallePaciente(detalle); })
+      .catch(err => console.error('Error al obtener detalle real del paciente:', err));
+    return () => { cancelado = true; };
+  }, [visita.pacienteId]);
 
   // Buscar objeto de plantilla actual
   const currentTemplate = templatesList.find(p => p.id === selectedTemplateId) || templatesList[0] || MOCK_PLANTILLAS[0];
@@ -243,7 +170,8 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
       setFormData(existing.contenido || {});
       setObservaciones(existing.observaciones || "");
       setCurrentFotoUrl(existing.fotoUrl || null);
-      
+      setCurrentFotoMimeType(existing.fotoMimeType || null);
+
       const preChecked: Record<number, boolean> = {};
       listadoProtocolos.forEach((_, idx) => {
         preChecked[idx] = true;
@@ -253,29 +181,34 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
       setFormData({});
       setObservaciones("");
       setCurrentFotoUrl(null);
+      setCurrentFotoMimeType(null);
       setProtocolChecked({});
     }
   }, [selectedTemplateId]);
 
-  // Obtener los detalles clínicos específicos del paciente buscando por RUT para soportar visitas reales
-  const detallesClinicos = Object.values(MOCK_DETALLES_PACIENTES).find(
-    (d: any) => d.rut === visita.paciente.rut
-  ) || {
-    rut: visita.paciente.rut || "N/A", edad: "N/A", sexo: "N/A", prevision: "N/A", cuidador: "N/A", referencia: "N/A",
-    historial: [], plan_cuidado: { diagnostico: "No especificado", objetivo: "No especificado", frecuencia: "N/A" },
-    esFragil: false
+  // Detalles clínicos reales (backend-p1-salud): dirección/referencia, cuidador y plan
+  // de cuidado. Los campos sin respaldo real en el backend (previsión) quedan "N/A"
+  // en vez de inventarse. No existe ningún concepto de "paciente frágil" en el
+  // backend hoy, así que esa señal ya no se muestra ni se auto-detecta.
+  const cuidadorReal = detallePaciente?.cuidador;
+  const planReal = detallePaciente?.planCuidado;
+  const detallesClinicos = {
+    rut: visita.paciente.rut || "N/A",
+    edad: calcularEdad(detallePaciente?.paciente?.fechaNacimiento),
+    sexo: detallePaciente?.paciente?.sexo || "N/A",
+    prevision: "N/A",
+    cuidador: cuidadorReal
+      ? `${cuidadorReal.nombre}${cuidadorReal.relacion ? ` (${cuidadorReal.relacion})` : ''}${cuidadorReal.telefono ? ` - ${cuidadorReal.telefono}` : ''}`
+      : "No hay contacto de cuidador registrado",
+    referencia: detallePaciente?.direccionPrincipal?.referencia || "No especificada",
+    historial: detallePaciente?.historial ?? [],
+    plan_cuidado: planReal
+      ? { objetivo: planReal.objetivo || "No especificado", descripcion: planReal.descripcion || "Sin descripción", estado: planReal.estado || "N/A" }
+      : { objetivo: "No hay plan de cuidado registrado", descripcion: "", estado: "N/A" },
   };
 
-  // Obtener historial farmacológico del paciente
-  const historialFarmacologico = Object.values(MOCK_MEDICACION_PACIENTES).find(
-    (m: any, idx) => {
-      const key = Object.keys(MOCK_DETALLES_PACIENTES)[idx];
-      return MOCK_DETALLES_PACIENTES[key]?.rut === visita.paciente.rut;
-    }
-  ) || {
-    alergias: ["No se registran datos"],
-    actuales: ["No se registran datos"]
-  };
+  // Alergias y medicación actual: sin respaldo en el backend todavía (ver constante arriba).
+  const historialFarmacologico = SIN_DATOS_ALERGIAS_MEDICACION;
 
   // Llamar al endpoint del sensor del Proyecto 8 (Consumo de API Real + Mocks de contingencia)
   const handleLeerSensores = async () => {
@@ -340,51 +273,76 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     }
   };
 
-  // Subir foto real al backend y guardar URL en la DB
-  const handleSubirFoto = async () => {
+  // Captura real de foto con expo-image-picker. El archivo local queda referenciado en
+  // currentFotoUrl/currentFotoMimeType; la subida real al backend (POST
+  // /documentos-adjuntos, con fichaClinicaId ya creado) ocurre recién en la
+  // sincronización, no acá.
+  const capturarConCamara = async () => {
     setIsUploadingPhoto(true);
     try {
-      const formDataObj = new FormData();
-      formDataObj.append('file', {
-        uri: 'https://picsum.photos/500/500', 
-        name: `photo-${Date.now()}.jpg`,
-        type: 'image/jpeg',
-      } as any);
-
-      const response = await fetch('http://192.168.1.13:3000/fichas-clinicas/upload', {
-        method: 'POST',
-        body: formDataObj,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data',
-        },
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert("Permiso requerido", "Necesitas dar permiso de cámara para adjuntar una foto.");
+        return;
+      }
+      const resultado = await ImagePicker.launchCameraAsync({
+        mediaTypes: 'images',
+        quality: 0.7,
       });
-
-      if (!response.ok) throw new Error('Error al subir la imagen');
-      const res = await response.json();
-      
-      setCurrentFotoUrl(res.url);
-      Alert.alert("Foto Subida", `Imagen almacenada correctamente en el servidor:\n${res.url}`);
-    } catch (error) {
-      console.error(error);
-      const fallbackUrl = `http://192.168.1.13:3000/uploads/photo-fallback-${Date.now()}.jpg`;
-      setCurrentFotoUrl(fallbackUrl);
-      Alert.alert("Subida Simulada", `Asignada URL simulada de fotos:\n${fallbackUrl}`);
+      if (!resultado.canceled && resultado.assets?.[0]) {
+        const asset = resultado.assets[0];
+        setCurrentFotoUrl(asset.uri);
+        setCurrentFotoMimeType(asset.mimeType ?? 'image/jpeg');
+      }
     } finally {
       setIsUploadingPhoto(false);
     }
   };
 
+  const elegirDeGaleria = async () => {
+    setIsUploadingPhoto(true);
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert("Permiso requerido", "Necesitas dar permiso de galería para adjuntar una foto.");
+        return;
+      }
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        quality: 0.7,
+      });
+      if (!resultado.canceled && resultado.assets?.[0]) {
+        const asset = resultado.assets[0];
+        setCurrentFotoUrl(asset.uri);
+        setCurrentFotoMimeType(asset.mimeType ?? 'image/jpeg');
+      }
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleSubirFoto = () => {
+    Alert.alert(
+      "Adjuntar fotografía",
+      "¿Cómo quieres agregar la foto?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Elegir de galería", onPress: elegirDeGaleria },
+        { text: "Tomar foto", onPress: capturarConCamara },
+      ]
+    );
+  };
+
   const handleMandarFicha = () => {
     // 1. Validar campos obligatorios de la plantilla activa
-    const camposIncompletos = currentTemplate.campos.filter(campo => {
+    const camposIncompletos = currentTemplate.campos.filter((campo: any) => {
       return campo.obligatorio && (!formData[campo.codigo] || formData[campo.codigo].toString().trim() === "");
     });
 
     if (camposIncompletos.length > 0) {
       Alert.alert(
         "Campos Obligatorios",
-        `Por favor completa los siguientes campos obligatorios:\n\n${camposIncompletos.map(c => `• ${c.etiqueta}`).join("\n")}`,
+        `Por favor completa los siguientes campos obligatorios:\n\n${camposIncompletos.map((c: any) => `• ${c.etiqueta}`).join("\n")}`,
         [{ text: "Entendido" }]
       );
       return;
@@ -435,6 +393,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
           contenido: formData,
           observaciones: observaciones,
           fotoUrl: currentFotoUrl,
+          fotoMimeType: currentFotoMimeType,
         }
       ];
     });
@@ -454,13 +413,12 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     setCheckInTime(timeStr);
     setEstadoVisita("EN_ATENCION");
     onUpdateVisitaState(visita.id, "EN_ATENCION");
-    
-    // Registrar checkpoint CHECK_IN en la cola
-    await onRegisterAttention('CHECK_IN', visita.id, {
-      latitud: -33.456,
-      longitud: -70.648,
-    });
-    
+
+    // Registrar checkpoint CHECK_IN en la cola. No se envían coordenadas: la
+    // geolocalización real (expo-location) todavía no está implementada en esta app,
+    // y es preferible no mandar lat/long sin GPS real.
+    await onRegisterAttention('CHECK_IN', visita.id, {});
+
     setActiveTab("CONSULTA"); // Llevar directo a la consulta tras el check-in
   };
 
@@ -494,20 +452,18 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     setIsLoading(true);
 
     try {
-      // 1. Encolar Check-out GPS
-      await onRegisterAttention('CHECK_OUT', visita.id, {
-        latitud: -33.457,
-        longitud: -70.649,
-      });
+      // 1. Encolar Check-out (sin coordenadas; ver nota en handleCheckIn)
+      await onRegisterAttention('CHECK_OUT', visita.id, {});
 
       // 2. Encolar cada una de las fichas completadas
       for (const ficha of fichasCompletadas) {
         await onRegisterAttention('FICHA_CLINICA', visita.id, {
-          plantilla_ficha_id: ficha.plantillaId,
+          plantillaFichaId: ficha.plantillaId,
           contenido: ficha.contenido,
           observaciones: ficha.observaciones,
-          prestaciones_realizadas: [visita.prestacion],
-          foto_url: ficha.fotoUrl,
+          prestacionesRealizadas: [visita.prestacion],
+          fotoLocalUri: ficha.fotoUrl,
+          fotoMimeType: ficha.fotoMimeType,
           conformidad: {
             nombre: signerName,
             rut: signerRut,
@@ -523,32 +479,23 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
       setIsLoading(false);
 
-      // Evaluación del Criterio de Continuidad (Paciente Frágil)
-      if (detallesClinicos.esFragil) {
-        Alert.alert(
-          "Atención Guardada",
-          "Esta atención ha sido guardada localmente.\n\n⚠️ ALERTA CLÍNICA: El paciente presenta ALTA FRAGILIDAD. ¿Deseas programar una visita de seguimiento de continuidad para mañana?",
-          [
-            { 
-              text: "No agendar", 
-              onPress: onBack 
-            },
-            { 
-              text: "Sí, Agendar Seguimiento", 
-              onPress: () => {
-                onScheduleFollowUp(visita);
-                Alert.alert("Éxito", "Visita de seguimiento agendada para mañana.", [{ text: "Ok", onPress: onBack }]);
-              } 
+      // No existe (todavía) un indicador real de "paciente frágil" en el backend, así
+      // que en vez de auto-detectarlo se ofrece la solicitud de continuidad siempre,
+      // como una opción manual del profesional.
+      Alert.alert(
+        "Atención Guardada",
+        "La consulta ha sido registrada localmente y se sincronizará automáticamente al recuperar internet.\n\n¿Deseas solicitar una visita de seguimiento de continuidad para este paciente?",
+        [
+          { text: "No, gracias", onPress: onBack },
+          {
+            text: "Solicitar Seguimiento",
+            onPress: () => {
+              onScheduleFollowUp(visita);
+              Alert.alert("Listo", "Solicitud de continuidad encolada; se enviará al coordinador al sincronizar.", [{ text: "Ok", onPress: onBack }]);
             }
-          ]
-        );
-      } else {
-        Alert.alert(
-          "Atención Guardada",
-          "La consulta ha sido registrada localmente en IndexedDB. Se sincronizará automáticamente al recuperar internet.",
-          [{ text: "Aceptar", onPress: onBack }]
-        );
-      }
+          }
+        ]
+      );
     } catch (err) {
       console.error(err);
       setIsLoading(false);
@@ -558,15 +505,15 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
   return (
     <VStack flex={1} bg={theme.colors.background}>
-      
+
       {/* 1. Header con Botón Volver y Info General del Paciente */}
       <Box padding="md" bg={theme.colors.yaleBlue} style={styles.header}>
         <HStack align="center" gap="sm">
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => {
               if (estadoVisita === "EN_ATENCION") {
                 Alert.alert(
-                  "Consulta en curso", 
+                  "Consulta en curso",
                   "Debes finalizar la consulta y registrar el Check-Out para guardar todo y salir de la visita. Si sales ahora, perderás las fichas que no hayas enviado. ¿Deseas salir de todos modos?",
                   [
                     { text: "Permanecer en Consulta", style: "cancel" },
@@ -577,7 +524,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                 onBack();
               }
             }}
-            activeOpacity={0.7} 
+            activeOpacity={0.7}
             style={styles.backButton}
           >
             <ArrowLeft size={24} color={theme.colors.white} />
@@ -587,11 +534,6 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               <Label variant="h2" color={theme.colors.white}>
                 {visita.paciente.nombres} {visita.paciente.apellidos}
               </Label>
-              {detallesClinicos.esFragil && (
-                <Box bg={theme.colors.danger} radius="sm" padding={2} style={{ paddingHorizontal: 6 }}>
-                  <Label variant="caption" color={theme.colors.white} style={{ fontSize: 10, fontWeight: 'bold' }}>FRÁGIL</Label>
-                </Box>
-              )}
             </HStack>
             <Label variant="caption" color="rgba(255,255,255,0.8)">
               {detallesClinicos.edad} • {detallesClinicos.sexo} • RUT: {detallesClinicos.rut}
@@ -602,7 +544,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
       {/* 2. Barra de Pestañas (Tabs) de la Ficha */}
       <HStack style={styles.tabBar} bg={theme.colors.white}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'DOMICILIO' && styles.activeTabItem]}
           onPress={() => setActiveTab('DOMICILIO')}
         >
@@ -614,7 +556,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
           </HStack>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'HISTORIAL' && styles.activeTabItem]}
           onPress={() => setActiveTab('HISTORIAL')}
         >
@@ -626,7 +568,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
           </HStack>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'CONSULTA' && styles.activeTabItem]}
           onPress={() => setActiveTab('CONSULTA')}
         >
@@ -641,7 +583,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
       {/* 3. Contenedor de Vistas */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         {/* TIPO A: VISTA DE DOMICILIO Y INDICACIONES */}
         {activeTab === 'DOMICILIO' && (
           <VStack gap="md">
@@ -653,9 +595,9 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               <Label variant="body" color={theme.colors.grayText} style={{ marginTop: 2 }}>
                 Comuna: {visita.direccion.comuna}
               </Label>
-              
+
               <View style={styles.separator} />
-              
+
               <Label variant="caption" style={{ fontWeight: 'bold' }}>Referencia de Llegada:</Label>
               <Label variant="body" color={theme.colors.graphite} style={styles.textNote}>
                 {detallesClinicos.referencia}
@@ -669,20 +611,17 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               </Label>
             </Box>
 
-            {/* MOCK DE MAPA */}
+            {/* Geolocalización real (expo-location) todavía no está implementada */}
             <Box bg={theme.colors.white} radius="md" align="center" padding="lg" style={styles.mapMock}>
-              <MapPin size={32} color={theme.colors.danger} />
-              <Label variant="body" style={{ fontWeight: '600', marginTop: 8 }}>Ubicación Georreferenciada</Label>
-              <Label variant="caption" color={theme.colors.grayText}>Lat: -33.4569 / Lon: -70.6482</Label>
-              <OutlineButton style={{ marginTop: 12, height: 38 }}>
-                Abrir en Google Maps
-              </OutlineButton>
+              <MapPin size={32} color={theme.colors.grayText} />
+              <Label variant="body" style={{ fontWeight: '600', marginTop: 8 }}>Ubicación no disponible</Label>
+              <Label variant="caption" color={theme.colors.grayText}>La captura de GPS real aún no está implementada en esta app.</Label>
             </Box>
 
             {/* CONTROL DE ESTADOS DE RUTA Y CHECK-IN */}
             <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
               <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>Flujo de Registro de Tiempos</Label>
-              
+
               {estadoVisita === "PROGRAMADA" && (
                 <SecondaryButton onPress={handleIniciarRuta}>
                   🚗 Iniciar Ruta hacia el Domicilio
@@ -723,22 +662,22 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
         {/* TIPO B: Plan de Cuidados, Botones de Medicamentos e Historial Clínico */}
         {activeTab === 'HISTORIAL' && (
           <VStack gap="md">
-            
+
             {/* ACCESO RÁPIDO A MEDICACIÓN Y ALERGIAS */}
             <HStack gap="sm" width="100%">
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
-                style={[styles.actionBadgeButton, { backgroundColor: '#FDF2E9', borderColor: '#F5C6A5' }]} 
+                style={[styles.actionBadgeButton, { backgroundColor: '#FDF2E9', borderColor: '#F5C6A5' }]}
                 onPress={() => setShowAllergiesModal(true)}
               >
                 <Label variant="caption" color="#D9381E" style={{ fontWeight: 'bold', fontSize: 13 }}>
                   🚫 Alergias Médicas
                 </Label>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 activeOpacity={0.8}
-                style={[styles.actionBadgeButton, { backgroundColor: '#EBF3F6', borderColor: '#BCE3EB' }]} 
+                style={[styles.actionBadgeButton, { backgroundColor: '#EBF3F6', borderColor: '#BCE3EB' }]}
                 onPress={() => setShowMedsModal(true)}
               >
                 <Label variant="caption" color={theme.colors.yaleBlue} style={{ fontWeight: 'bold', fontSize: 13 }}>
@@ -750,36 +689,41 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
             {/* Plan de Cuidado Longitudinal */}
             <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
               <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 8 }}>Plan de Cuidado Activo</Label>
-              <Label variant="caption" style={{ fontWeight: 'bold' }}>Diagnóstico:</Label>
-              <Label variant="body" style={styles.textNote}>{detallesClinicos.plan_cuidado.diagnostico}</Label>
-              
-              <View style={styles.separator} />
-              
-              <Label variant="caption" style={{ fontWeight: 'bold' }}>Objetivo General:</Label>
+              <Label variant="caption" style={{ fontWeight: 'bold' }}>Objetivo:</Label>
               <Label variant="body" style={styles.textNote}>{detallesClinicos.plan_cuidado.objetivo}</Label>
 
+              {!!detallesClinicos.plan_cuidado.descripcion && (
+                <>
+                  <View style={styles.separator} />
+                  <Label variant="caption" style={{ fontWeight: 'bold' }}>Descripción:</Label>
+                  <Label variant="body" style={styles.textNote}>{detallesClinicos.plan_cuidado.descripcion}</Label>
+                </>
+              )}
+
               <View style={styles.separator} />
-              
-              <Label variant="caption" style={{ fontWeight: 'bold' }}>Frecuencia Recomendada:</Label>
-              <Label variant="body" style={styles.textNote}>{detallesClinicos.plan_cuidado.frecuencia}</Label>
+
+              <Label variant="caption" style={{ fontWeight: 'bold' }}>Estado:</Label>
+              <Label variant="body" style={styles.textNote}>{detallesClinicos.plan_cuidado.estado}</Label>
             </Box>
 
-            {/* Historial de Notas Clínicas */}
+            {/* Historial de Mediciones Clínicas */}
             <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
-              <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>Historial de Controles</Label>
-              
-              {detallesClinicos.historial.map((h: any, idx: number) => (
+              <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>Historial de Mediciones</Label>
+
+              {detallesClinicos.historial.length === 0 ? (
+                <Label variant="body" color={theme.colors.grayText}>No hay mediciones registradas para este paciente.</Label>
+              ) : detallesClinicos.historial.map((h: any, idx: number) => (
                 <VStack key={idx} style={styles.historyItem}>
                   <HStack justify="space-between" align="center">
                     <Label variant="caption" style={{ fontWeight: 'bold' }} color={theme.colors.yaleBlue}>
-                      {h.fecha}
+                      {new Date(h.fecha).toLocaleString()}
                     </Label>
                     <Label variant="caption" color={theme.colors.grayText}>
-                      {h.profesional}
+                      {h.variable}
                     </Label>
                   </HStack>
                   <Label variant="body" color={theme.colors.graphite} style={{ marginTop: 4 }}>
-                    {h.notas}
+                    {h.valor}
                   </Label>
                   {idx < detallesClinicos.historial.length - 1 && <View style={styles.historyDivider} />}
                 </VStack>
@@ -805,7 +749,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               </Box>
             ) : (
               <VStack gap="md">
-                
+
                 {/* SELECTOR DE PLANTILLAS DINÁMICAS */}
                 <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
                   <VStack gap="sm">
@@ -847,7 +791,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   <Label variant="caption" style={{ marginBottom: 10 }}>
                     Marca los pasos ejecutados. Bloquea el guardado si no se cumplen.
                   </Label>
-                  
+
                   <VStack gap="sm">
                     {listadoProtocolos.map((paso, idx) => {
                       const isChecked = !!protocolChecked[idx];
@@ -872,11 +816,11 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
                 {/* CONSTRUCTOR DE FORMULARIO DINÁMICO */}
                 <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
-                  
+
                   {/* BOTÓN CAPTURA DE SENSORES (PROYECTO 8) */}
                   {(selectedTemplateId === "p1" || selectedTemplateId === "p3") && estadoVisita !== "REALIZADA" && (
-                    <SecondaryButton 
-                      isLoading={isReadingSensor} 
+                    <SecondaryButton
+                      isLoading={isReadingSensor}
                       style={{ marginBottom: 16, backgroundColor: theme.colors.stormyTeal }}
                       onPress={handleLeerSensores}
                     >
@@ -887,9 +831,9 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>
                     Datos del Formulario: {currentTemplate.nombre}
                   </Label>
-                  
+
                   <VStack gap="md">
-                    {currentTemplate.campos.map((campo) => {
+                    {currentTemplate.campos.map((campo: any) => {
                       const value = formData[campo.codigo] || "";
 
                       const handleValueChange = (val: any) => {
@@ -946,7 +890,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                               {campo.etiqueta}{campo.obligatorio ? ' *' : ''}
                             </Label>
                             <HStack gap="xs" style={{ flexWrap: 'wrap' }}>
-                              {campo.opciones?.map((opcion) => {
+                              {campo.opciones?.map((opcion: any) => {
                                 const isOptionSelected = value === opcion;
                                 return (
                                   <TouchableOpacity
@@ -998,7 +942,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                 {/* Observaciones y Fotos */}
                 <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
                   <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>Observaciones y Adjuntos</Label>
-                  
+
                   <Label variant="caption" style={styles.inputLabel}>Evolución Clínica / Notas Generales</Label>
                   <TextInput
                     style={styles.textArea}
@@ -1020,8 +964,8 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                         {currentFotoUrl ? `✓ Foto subida: ...${currentFotoUrl.substring(currentFotoUrl.lastIndexOf('/'))}` : "Opcional: heridas, recetas..."}
                       </Label>
                     </VStack>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       style={[styles.cameraButton, currentFotoUrl && styles.cameraButtonActive]}
                       onPress={() => estadoVisita !== "REALIZADA" && handleSubirFoto()}
                       disabled={isUploadingPhoto || estadoVisita === "REALIZADA"}
@@ -1077,8 +1021,8 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                 {estadoVisita === "EN_ATENCION" && (
                   <VStack gap="xs" style={{ paddingVertical: 8 }}>
                     {/* Botón de Guardado Individual de Ficha */}
-                    <SecondaryButton 
-                      onPress={handleMandarFicha} 
+                    <SecondaryButton
+                      onPress={handleMandarFicha}
                       style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success, height: 46 }}
                     >
                       <Label variant="caption" color={theme.colors.white} style={{ fontWeight: 'bold' }}>
@@ -1087,8 +1031,8 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                     </SecondaryButton>
 
                     {/* Botón de Cierre General de Consulta */}
-                    <PrimaryButton 
-                      isLoading={isLoading} 
+                    <PrimaryButton
+                      isLoading={isLoading}
                       onPress={handlePreFinalizar}
                       style={{ height: 46, marginTop: 4 }}
                     >
@@ -1114,7 +1058,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
             <VStack gap="md">
               <Label variant="h2" color={theme.colors.danger}>🚫 Medicamentos Alérgicos</Label>
               <Label variant="caption">Sustancias a las que el paciente reacciona desfavorablemente.</Label>
-              
+
               <VStack gap="xs" style={{ marginTop: 8 }}>
                 {historialFarmacologico.alergias.map((item, idx) => (
                   <Box key={idx} bg="#FDF2E9" padding="sm" radius="sm">
@@ -1124,9 +1068,9 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   </Box>
                 ))}
               </VStack>
-              
-              <PrimaryButton 
-                style={{ backgroundColor: theme.colors.danger, marginTop: 12 }} 
+
+              <PrimaryButton
+                style={{ backgroundColor: theme.colors.danger, marginTop: 12 }}
                 onPress={() => setShowAllergiesModal(false)}
               >
                 Cerrar Ventana
@@ -1148,7 +1092,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
             <VStack gap="md">
               <Label variant="h2" color={theme.colors.yaleBlue}>💊 Medicación Actual</Label>
               <Label variant="caption">Lista de fármacos que el paciente toma actualmente de forma regular.</Label>
-              
+
               <ScrollView style={{ maxHeight: 200, marginTop: 8 }}>
                 <VStack gap="xs">
                   {historialFarmacologico.actuales.map((item, idx) => (
@@ -1160,9 +1104,9 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   ))}
                 </VStack>
               </ScrollView>
-              
-              <PrimaryButton 
-                style={{ marginTop: 12 }} 
+
+              <PrimaryButton
+                style={{ marginTop: 12 }}
                 onPress={() => setShowMedsModal(false)}
               >
                 Cerrar Ventana
@@ -1186,7 +1130,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               <Label variant="caption">
                 Registra la identidad y la firma de conformidad del paciente o cuidador a cargo para finalizar el servicio.
               </Label>
-              
+
               <VStack gap="sm" style={{ marginTop: 4 }}>
                 <FormInput
                   label="Nombre del Receptor / Cuidador"
@@ -1228,17 +1172,17 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   </TouchableOpacity>
                 </VStack>
               </VStack>
-              
+
               <HStack gap="sm" style={{ marginTop: 12 }}>
-                <OutlineButton 
-                  style={{ flex: 1 }} 
+                <OutlineButton
+                  style={{ flex: 1 }}
                   onPress={() => setShowSignatureModal(false)}
                 >
                   Volver
                 </OutlineButton>
-                
-                <PrimaryButton 
-                  style={{ flex: 1.5 }} 
+
+                <PrimaryButton
+                  style={{ flex: 1.5 }}
                   onPress={handleFinalizarConFirma}
                   disabled={!signerName || !signerRut || !hasDrawnSignature}
                 >
@@ -1257,8 +1201,8 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 const styles = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === 'ios' ? 44 : 20,
-    borderBottomLeftRadius: theme.borderRadius.lg,
-    borderBottomRightRadius: theme.borderRadius.lg,
+    borderBottomLeftRadius: theme.radius.lg,
+    borderBottomRightRadius: theme.radius.lg,
   },
   backButton: {
     padding: theme.spacing.xs,
@@ -1319,7 +1263,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     padding: theme.spacing.sm,
     fontSize: 15,
     color: theme.colors.graphite,
@@ -1329,7 +1273,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     width: 44,
     height: 44,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
     alignItems: 'center',
@@ -1347,7 +1291,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderWidth: 1,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xs,
@@ -1372,7 +1316,7 @@ const styles = StyleSheet.create({
   templateBadge: {
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs + 2,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: theme.radius.round,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
     backgroundColor: theme.colors.white,
@@ -1384,7 +1328,7 @@ const styles = StyleSheet.create({
   optionBadge: {
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs + 2,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
     backgroundColor: '#F5F5F5',
@@ -1399,7 +1343,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EAEAEA',
     padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.radius.sm,
   },
   protocolRow: {
     paddingVertical: theme.spacing.xs,
@@ -1411,7 +1355,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     borderStyle: 'dashed',
     backgroundColor: '#F9F9F9',
     alignItems: 'center',
@@ -1431,7 +1375,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EBF3F6',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: '#BCE3EB',
   },

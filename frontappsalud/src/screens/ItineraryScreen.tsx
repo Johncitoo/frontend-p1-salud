@@ -6,86 +6,15 @@ import { Label } from '../components/Label';
 import { Card } from '../components/Card';
 import { Search, Wifi, WifiOff, RefreshCw, ChevronRight } from 'lucide-react-native';
 
-// Datos de prueba simulados basados en las tablas 'visitas', 'pacientes' y 'direcciones_paciente' de bd.sql
-const MOCK_VISITAS = [
-  {
-    id: "v1",
-    hora: "09:00 AM",
-    estado: "REALIZADA",
-    prioridad: "NORMAL",
-    paciente: {
-      nombres: "Juan Carlos",
-      apellidos: "Gómez Pérez",
-      rut: "12.345.678-9",
-    },
-    direccion: {
-      calle: "Av. Providencia",
-      numero: "1045",
-      comuna: "Providencia",
-    },
-    prestacion: "Control Presión y Curación simple",
-  },
-  {
-    id: "v2",
-    hora: "11:30 AM",
-    estado: "EN_ATENCION",
-    prioridad: "URGENTE", // Pacientes con prioridad alta/reingreso
-    paciente: {
-      nombres: "María Elena",
-      apellidos: "Soto Silva",
-      rut: "9.876.543-2",
-    },
-    direccion: {
-      calle: "Calle Los Magnolios",
-      numero: "450",
-      comuna: "Maipú",
-    },
-    prestacion: "Terapia Kinesiológica Respiratoria",
-  },
-  {
-    id: "v3",
-    hora: "03:00 PM",
-    estado: "PROGRAMADA",
-    prioridad: "ALTA",
-    paciente: {
-      nombres: "Pedro Andrés",
-      apellidos: "Morales Díaz",
-      rut: "15.678.901-k",
-    },
-    direccion: {
-      calle: "Pasaje El Vergel",
-      numero: "12",
-      comuna: "La Florida",
-    },
-    prestacion: "Administración Antibiótico EV",
-  },
-  {
-    id: "v4",
-    hora: "05:30 PM",
-    estado: "PROGRAMADA",
-    prioridad: "BAJA",
-    paciente: {
-      nombres: "Ana María",
-      apellidos: "Rojas Castro",
-      rut: "7.654.321-0",
-    },
-    direccion: {
-      calle: "Av. Las Condes",
-      numero: "8900",
-      comuna: "Las Condes",
-    },
-    prestacion: "Evaluación clínica general",
-  }
-];
-
 interface ItineraryScreenProps {
   visitas: any[];
   onSelectVisita: (visitaId: string) => void;
   isOnline: boolean;
   onSync: () => Promise<void>;
+  profesionalNombre?: string;
 }
 
-export default function ItineraryScreen({ visitas, onSelectVisita, isOnline, onSync }: ItineraryScreenProps) {
+export default function ItineraryScreen({ visitas, onSelectVisita, isOnline, onSync, profesionalNombre }: ItineraryScreenProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -146,7 +75,7 @@ export default function ItineraryScreen({ visitas, onSelectVisita, isOnline, onS
         <HStack justify="space-between" align="center" width="100%">
           <VStack>
             <Label variant="caption" color="rgba(255,255,255,0.7)">Bienvenido/a</Label>
-            <Label variant="h1" color={theme.colors.white}>Dr. Carlos Torres</Label>
+            <Label variant="h1" color={theme.colors.white}>{profesionalNombre ?? 'Profesional'}</Label>
           </VStack>
           
           <View 
@@ -289,13 +218,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   header: {
-    borderBottomLeftRadius: theme.borderRadius.lg,
-    borderBottomRightRadius: theme.borderRadius.lg,
+    borderBottomLeftRadius: theme.radius.lg,
+    borderBottomRightRadius: theme.radius.lg,
   },
   connectionBadge: {
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.round,
+    borderRadius: theme.radius.round,
   },
   searchContainer: {
     flex: 1,
@@ -304,7 +233,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.white,
     borderWidth: 1,
     borderColor: theme.colors.alabasterGrey,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     height: 44,
     paddingHorizontal: theme.spacing.sm,
   },
@@ -321,7 +250,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     backgroundColor: theme.colors.stormyTeal,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,16 +1,25 @@
 import React from 'react';
 import { TextInput, View, TextInputProps } from 'react-native';
 import { theme } from '../theme';
+import { Label } from './Label';
 
 interface InputProps extends TextInputProps {
   error?: string;
+  label?: string;
+  isPassword?: boolean;
 }
 
-export function Input({ error, style, ...props }: InputProps) {
+export function Input({ error, label, isPassword, style, ...props }: InputProps) {
   return (
     <View>
+      {label ? (
+        <Label variant="caption" style={{ fontWeight: '600', marginBottom: 4 }}>
+          {label}
+        </Label>
+      ) : null}
       <TextInput
         placeholderTextColor={theme.colors.grayText}
+        secureTextEntry={isPassword}
         style={[
           {
             backgroundColor: theme.colors.white,
@@ -27,16 +36,9 @@ export function Input({ error, style, ...props }: InputProps) {
         {...props}
       />
       {error ? (
-        <View style={{ marginTop: 4 }}>
-          <TextInput
-            editable={false}
-            style={{
-              color: theme.colors.danger,
-              fontSize: theme.fontSize.caption,
-            }}
-            value={error}
-          />
-        </View>
+        <Label variant="caption" color={theme.colors.danger} style={{ marginTop: 4 }}>
+          {error}
+        </Label>
       ) : null}
     </View>
   );

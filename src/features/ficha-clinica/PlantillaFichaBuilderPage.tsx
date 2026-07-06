@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ClipboardPen, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, ClipboardPen, Plus, Save, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import type { PlantillaCampoRow, PlantillaFichaRow, VariableClinicaRow } from './types'
@@ -27,6 +27,7 @@ type DraftCampo = {
   opciones: string[]
   obligatorio: boolean
   orden: number
+  ayudaTexto?: string
 }
 
 type CreatePlantillaPayload = {
@@ -45,6 +46,7 @@ type CreateCampoPayload = {
   opciones?: Record<string, string>
   obligatorio: boolean
   orden: number
+  ayudaTexto?: string | null
 }
 
 type PlantillaFichaBuilderPageProps = {
@@ -60,19 +62,18 @@ type BuilderDraft = {
 
 const fieldClassName =
   'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#3C6E71] focus:ring-2 focus:ring-[#3C6E71]/15'
-const labelClassName = 'text-sm font-medium text-slate-700'
+const labelClassName = 'block text-xs font-bold uppercase tracking-wider text-[#9CBFC1]'
 
 const fieldTypes: Array<{ value: FieldType; label: string; description: string }> = [
-  { value: 'TEXTO_LIBRE', label: 'Texto libre', description: 'Observaciones, motivo, comentarios.' },
-  { value: 'NUMERO_LIBRE', label: 'Numero libre', description: 'Numero no normalizado.' },
-  { value: 'BOOLEANO', label: 'Si/No', description: 'Campo verdadero/falso.' },
-  { value: 'FECHA', label: 'Fecha', description: 'Fecha simple.' },
-  { value: 'SELECT', label: 'Seleccion unica', description: 'Lista de opciones.' },
-  { value: 'MULTISELECT', label: 'Seleccion multiple', description: 'Varias opciones.' },
-  { value: 'JSON', label: 'JSON', description: 'Dato estructurado.' },
-  { value: 'ARCHIVO', label: 'Archivo', description: 'Referencia a documento.' },
-  { value: 'IMAGEN', label: 'Imagen', description: 'Referencia a imagen.' },
-  { value: 'VARIABLE_CLINICA', label: 'Variable clinica', description: 'Dato medible del catalogo.' },
+  { value: 'MULTISELECT', label: 'Lista de verificación / Checklist', description: 'Casillas múltiples para marcar tareas o procedimientos realizados.' },
+  { value: 'VARIABLE_CLINICA', label: 'Signo Vital / Catálogo de Mediciones', description: 'Parámetro clínico normalizado (Temperatura, Presión, SatO2, etc.).' },
+  { value: 'TEXTO_LIBRE', label: 'Notas de Evolución / Comentarios (Texto)', description: 'Observaciones generales o evolución del paciente.' },
+  { value: 'BOOLEANO', label: 'Sí / No (Confirmación única)', description: 'Preguntas de descarte o estado binario (ej: presenta dolor).' },
+  { value: 'SELECT', label: 'Menú de Selección Única', description: 'Elegir una sola opción de una lista de alternativas.' },
+  { value: 'NUMERO_LIBRE', label: 'Medición Numérica Simple', description: 'Valores numéricos libres no normalizados.' },
+  { value: 'FECHA', label: 'Fecha', description: 'Fecha de evento o registro.' },
+  { value: 'ARCHIVO', label: 'Archivo Adjunto', description: 'Documentos, informes o PDFs.' },
+  { value: 'IMAGEN', label: 'Imagen / Registro Fotográfico', description: 'Captura fotográfica de heridas o entornos.' },
 ]
 
 const normalizeCode = (value: string) =>
@@ -107,6 +108,7 @@ const emptyCampo = (orden: number): DraftCampo => ({
   opciones: [],
   obligatorio: false,
   orden,
+  ayudaTexto: '',
 })
 
 const ensureFieldCodes = (campos: DraftCampo[]) =>
@@ -162,6 +164,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                 opciones: readOptions(campo.opciones),
                 obligatorio: campo.obligatorio,
                 orden: index + 1,
+                ayudaTexto: campo.ayudaTexto ?? '',
               })),
           )
         }
@@ -270,6 +273,27 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
     })
   }
 
+  const moveCampoUp = (index: number) => {
+    if (index === 0) return
+    setCampos(prev => {
+      const next = [...prev]
+      const temp = next[index]
+      next[index] = next[index - 1]
+      next[index - 1] = temp
+      return next.map((campo, idx) => ({ ...campo, orden: idx + 1 }))
+    })
+  }
+
+  const moveCampoDown = (index: number) => {
+    if (index === campos.length - 1) return
+    setCampos(prev => {
+      const next = [...prev]
+      const temp = next[index]
+      next[index] = next[index + 1]
+      next[index + 1] = temp
+      return next.map((campo, idx) => ({ ...campo, orden: idx + 1 }))
+    })
+  }
   const addPresionArterial = () => {
     const sistolica = variables.find(variable => variable.codigo === 'presion_arterial_sistolica')
     const diastolica = variables.find(variable => variable.codigo === 'presion_arterial_diastolica')
@@ -381,6 +405,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
           opciones: fieldSupportsOptions(campo.tipoCampo) ? optionsToRecord(campo.opciones) : {},
           obligatorio: campo.obligatorio,
           orden: campo.orden,
+          ayudaTexto: campo.ayudaTexto || null,
         }
 
         if (campo.id) {
@@ -504,23 +529,45 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
 
             <div className='space-y-4'>
               {campos.map((campo, index) => (
-                <article key={campo.localId} className='rounded-xl border border-slate-200 bg-slate-50 p-4'>
+                <article key={campo.localId} className='rounded-xl border border-[#3C6E71]/40 bg-[#182F3F] p-5 shadow-inner'>
                   <div className='mb-4 flex items-center justify-between gap-3'>
-                    <span className='rounded-full bg-[#284B63] px-3 py-1 text-xs font-bold text-white'>
-                      Campo {index + 1}
-                    </span>
+                    <div className='flex items-center gap-2'>
+                      <span className='rounded-full bg-[#284B63] px-3 py-1 text-xs font-bold text-white'>
+                        Campo {index + 1}
+                      </span>
+                      <div className='flex items-center gap-1'>
+                        <button
+                          type='button'
+                          onClick={() => moveCampoUp(index)}
+                          disabled={index === 0}
+                          className='rounded-lg border border-[#3C6E71]/40 p-1 text-[#9CBFC1] hover:bg-[#3C6E71]/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 transition'
+                          title='Subir campo'
+                        >
+                          <ArrowUp className='size-3.5' />
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => moveCampoDown(index)}
+                          disabled={index === campos.length - 1}
+                          className='rounded-lg border border-[#3C6E71]/40 p-1 text-[#9CBFC1] hover:bg-[#3C6E71]/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 transition'
+                          title='Bajar campo'
+                        >
+                          <ArrowDown className='size-3.5' />
+                        </button>
+                      </div>
+                    </div>
                     <button
                       type='button'
                       onClick={() => removeCampo(campo.localId)}
                       disabled={campos.length === 1}
-                      className='inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40'
+                      className='inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40'
                     >
                       <Trash2 className='size-3.5' />
                       Quitar
                     </button>
                   </div>
 
-                  <div className='grid gap-4 lg:grid-cols-4'>
+                  <div className='flex flex-col gap-4'>
                     <label className={labelClassName}>
                       Tipo de campo <span className='text-red-600'>*</span>
                       <select
@@ -534,13 +581,13 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                           </option>
                         ))}
                       </select>
-                      <span className='mt-1 block text-xs text-slate-500'>
+                      <span className='mt-1 block text-xs text-[#8fa3b0]'>
                         {fieldTypes.find(type => type.value === campo.tipoCampo)?.description}
                       </span>
                     </label>
 
                     {campo.tipoCampo === 'VARIABLE_CLINICA' && (
-                      <label className={`${labelClassName} lg:col-span-3`}>
+                      <label className={labelClassName}>
                         Variable clinica <span className='text-red-600'>*</span>
                         <select
                           value={campo.variableClinicaId ?? ''}
@@ -557,7 +604,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                       </label>
                     )}
 
-                    <label className={`${labelClassName} lg:col-span-2`}>
+                    <label className={labelClassName}>
                       Etiqueta <span className='text-red-600'>*</span>
                       <input
                         value={campo.etiqueta}
@@ -569,15 +616,28 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                               : normalizeCode(event.target.value),
                           })
                         }}
-                        placeholder='Motivo de atencion'
+                        placeholder='Ej: Curación de herida, Temperatura'
                         className={fieldClassName}
                       />
-                      <span className='mt-1 block text-xs text-slate-500'>
+                      <span className='mt-1 block text-xs text-[#8fa3b0]'>
                         El identificador interno se genera automaticamente desde esta etiqueta.
                       </span>
                     </label>
 
-                    <label className='mt-8 flex items-center gap-2 text-sm font-semibold text-slate-700'>
+                    <label className={labelClassName}>
+                      Texto de ayuda o guía para el profesional
+                      <input
+                        value={campo.ayudaTexto ?? ''}
+                        onChange={event => updateCampo(campo.localId, { ayudaTexto: event.target.value })}
+                        placeholder='Ej: Registrar valor en grados Celsius, Marcar lo realizado'
+                        className={fieldClassName}
+                      />
+                      <span className='mt-1 block text-xs text-[#8fa3b0]'>
+                        Se mostrará como guía o marcador bajo el campo al rellenar la ficha.
+                      </span>
+                    </label>
+
+                    <label className='flex items-center gap-2 text-sm font-semibold text-slate-700 my-1'>
                       <input
                         type='checkbox'
                         checked={campo.obligatorio}
@@ -592,7 +652,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                         <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
                           <div>
                             <p className='m-0 text-sm font-semibold text-slate-700'>Opciones</p>
-                            <p className='m-0 text-xs text-slate-500'>
+                            <p className='m-0 text-xs text-[#8fa3b0]'>
                               Escribe las alternativas que vera quien llene esta ficha.
                             </p>
                           </div>
@@ -618,7 +678,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
                               <button
                                 type='button'
                                 onClick={() => removeOption(campo.localId, optionIndex)}
-                                className='mt-1.5 inline-flex h-11 shrink-0 items-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50'
+                                className='mt-1.5 inline-flex h-11 shrink-0 items-center rounded-lg border border-red-500/30 px-3 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300'
                               >
                                 Quitar
                               </button>
