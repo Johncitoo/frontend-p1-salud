@@ -52,14 +52,37 @@ export default function App() {
     try {
       await syncService.guardarAtencionLocal(tipo, visitaId, data);
       console.log(`Atención guardada localmente en Dexie: ${tipo} para visita ${visitaId}`);
+      intentarSincronizarPendientes();
     } catch (err) {
       console.error("Error guardando atención en IndexedDB:", err);
+    }
+  };
+
+  // Sube la cola pendiente sin intervención manual. Se llama apenas se encola
+  // un registro nuevo y, como respaldo, en un intervalo periódico mientras haya
+  // señal (por si un intento anterior falló o quedaron registros de una sesión previa).
+  const intentarSincronizarPendientes = async () => {
+    if (!isOnline) return;
+    try {
+      const pendientes = await db.syncQueue.count();
+      if (pendientes === 0) return;
+      const resultado = await syncService.sincronizarRegistrosPendientes();
+      console.log(`Auto-sincronización: ${resultado.procesados} procesados, ${resultado.fallidos} fallidos`);
+    } catch (err) {
+      console.error("Error en auto-sincronización:", err);
     }
   };
 
   // Inicializar base de datos local y descargar datos dinámicos
   useEffect(() => {
     handleDescargarDatos();
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    intentarSincronizarPendientes();
+    const interval = setInterval(intentarSincronizarPendientes, 20000);
+    return () => clearInterval(interval);
   }, [isOnline]);
 
   const handleLoginSuccess = () => {

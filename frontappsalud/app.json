@@ -2,6 +2,7 @@
   "expo": {
     "name": "tmp_expo",
     "slug": "tmp_expo",
+    "scheme": "frontappsalud",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,7 +30,8 @@
           "photosPermission": "Permite a la app acceder a tus fotos para adjuntarlas a la ficha de atención.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

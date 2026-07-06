@@ -5,8 +5,12 @@
   "dependencies": {
     "dexie": "^4.4.3",
     "expo": "~56.0.11",
+    "expo-auth-session": "~56.0.15",
+    "expo-crypto": "~56.0.4",
+    "expo-file-system": "~56.0.8",
     "expo-image-picker": "~56.0.19",
     "expo-status-bar": "~56.0.4",
+    "expo-web-browser": "~56.0.5",
     "fake-indexeddb": "^6.0.0",
     "lucide-react-native": "^1.17.0",
     "react": "19.2.3",

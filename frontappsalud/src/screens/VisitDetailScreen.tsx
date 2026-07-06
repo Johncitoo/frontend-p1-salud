@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, View, TextInput, Switch, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, View, TextInput, Switch, Platform, Alert, Modal, ActivityIndicator, Linking } from 'react-native';
 import { theme } from '../theme';
 import { Box, VStack, HStack } from '../components/Layout';
 import { Label } from '../components/Label';
@@ -402,6 +402,16 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
   };
 
   // Manejar el cambio de estado de la visita (Simulando GPS)
+  // No hay GPS real (expo-location) todavía, pero la dirección como texto alcanza
+  // para delegarle la navegación a Google Maps en vez de mostrar un mapa propio.
+  const handleAbrirEnMaps = () => {
+    const direccionTexto = `${visita.direccion.calle} ${visita.direccion.numero}, ${visita.direccion.comuna}`.trim();
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccionTexto)}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('No se pudo abrir Maps', 'Verifica que tengas una app de mapas instalada.');
+    });
+  };
+
   const handleIniciarRuta = () => {
     setEstadoVisita("EN_CAMINO");
     onUpdateVisitaState(visita.id, "EN_CAMINO");
@@ -611,12 +621,15 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
               </Label>
             </Box>
 
-            {/* Geolocalización real (expo-location) todavía no está implementada */}
-            <Box bg={theme.colors.white} radius="md" align="center" padding="lg" style={styles.mapMock}>
-              <MapPin size={32} color={theme.colors.grayText} />
-              <Label variant="body" style={{ fontWeight: '600', marginTop: 8 }}>Ubicación no disponible</Label>
-              <Label variant="caption" color={theme.colors.grayText}>La captura de GPS real aún no está implementada en esta app.</Label>
-            </Box>
+            {/* Geolocalización real (expo-location) todavía no está implementada; en su
+                lugar, delega la navegación a Google Maps usando la dirección en texto. */}
+            <TouchableOpacity onPress={handleAbrirEnMaps} activeOpacity={0.7}>
+              <Box bg={theme.colors.white} radius="md" align="center" padding="lg" style={styles.mapMock}>
+                <MapPin size={32} color={theme.colors.yaleBlue} />
+                <Label variant="body" style={{ fontWeight: '600', marginTop: 8 }}>Abrir en Google Maps</Label>
+                <Label variant="caption" color={theme.colors.grayText}>Toca para ver la ruta hacia esta dirección.</Label>
+              </Box>
+            </TouchableOpacity>
 
             {/* CONTROL DE ESTADOS DE RUTA Y CHECK-IN */}
             <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
