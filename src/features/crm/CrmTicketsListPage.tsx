@@ -182,6 +182,23 @@ export default function CrmTicketsListPage() {
                         <p className='text-xs font-semibold text-[#9CBFC1]'>Asunto CRM</p>
                         <p className='mt-1 text-sm text-white'>{externalStatus.titulo}</p>
                       </div>
+                      {externalStatus.resolucion && (
+                        <div className='rounded-lg bg-black/20 p-3'>
+                          <p className='text-xs font-semibold text-[#9CBFC1]'>Resolución</p>
+                          <p className='mt-1 text-sm text-white'>{externalStatus.resolucion}</p>
+                        </div>
+                      )}
+                      {externalStatus.fechaVencimientoSla && (
+                        <div className='rounded-lg bg-black/20 p-3'>
+                          <p className='text-xs font-semibold text-[#9CBFC1]'>Vencimiento SLA</p>
+                          <p className='mt-1 text-sm text-white'>
+                            {new Date(externalStatus.fechaVencimientoSla).toLocaleString('es-CL')}
+                          </p>
+                        </div>
+                      )}
+                      {externalStatus.mensaje && (
+                        <p className='text-xs text-[#9CBFC1]'>{externalStatus.mensaje}</p>
+                      )}
                     </div>
                   ) : (
                     <div className='flex items-start gap-3 rounded-lg bg-red-500/10 p-3 text-red-400'>

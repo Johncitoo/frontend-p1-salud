@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 
 export interface LocalVisita {
   id: string;
+  pacienteId: string;
   hora: string;
   estado: string;
   prioridad: string;
@@ -16,6 +17,7 @@ export interface LocalVisita {
     comuna: string;
   };
   prestacion: string;
+  fichaClinicaId?: string;
 }
 
 export interface LocalPlantilla {
@@ -34,7 +36,7 @@ export interface LocalPlantilla {
 
 export interface SyncQueueItem {
   id?: number;
-  tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA';
+  tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'SOLICITUD_CONTINUIDAD';
   visita_id: string;
   data: any;
   timestamp: number;

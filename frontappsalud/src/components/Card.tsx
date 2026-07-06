@@ -29,7 +29,7 @@ export const CardFooter: React.FC<ViewProps> = ({ children, style, ...props }) =
 const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     width: '100%',
     maxWidth: 400,

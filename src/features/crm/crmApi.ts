@@ -14,5 +14,5 @@ export const getCrmTickets = async (params?: {
 }
 
 export const getCrmTicketExternalStatus = async (id: string) => {
-  return await apiGet<CrmExternalStatus>(`/incidentes-salud/externo/${id}`)
+  return await apiGet<CrmExternalStatus>(`/incidentes-salud/${id}/crm`)
 }

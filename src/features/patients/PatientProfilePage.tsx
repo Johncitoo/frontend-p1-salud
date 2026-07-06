@@ -54,30 +54,36 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
   const [sensorType, setSensorType] = useState('glucometer')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const loadData = () => {
+    Promise.all([
+      apiGet<PatientRow>(`/pacientes/${patientId}`),
+      apiGet<MedicionRow[]>(`/mediciones-clinicas?pacienteId=${patientId}`),
+      apiGet<AlertaRow[]>(`/alertas?pacienteId=${patientId}`),
+      apiGet<DeviceRow[]>(`/iot/paciente-sensores/${patientId}`),
+    ]).then(([pat, meds, alts, devs]) => {
+      setPatient(pat)
+      setMediciones(meds)
+      setAlertas(alts.filter(a => a.tipo.startsWith('IOT_')))
+      setDevices(devs)
+      setIsLoading(false)
+    }).catch(console.error)
+  }
+
   useEffect(() => {
-    let isMounted = true
-
-    const loadData = () => {
-      Promise.all([
-        apiGet<PatientRow>(`/pacientes/${patientId}`),
-        apiGet<MedicionRow[]>(`/mediciones-clinicas?pacienteId=${patientId}`),
-        apiGet<AlertaRow[]>(`/alertas?pacienteId=${patientId}`),
-        apiGet<DeviceRow[]>(`/iot/paciente-sensores/${patientId}`),
-      ]).then(([pat, meds, alts, devs]) => {
-        if (isMounted) {
-          setPatient(pat)
-          setMediciones(meds)
-          setAlertas(alts.filter(a => a.tipo.startsWith('IOT_')))
-          setDevices(devs)
-          setIsLoading(false)
-        }
-      }).catch(console.error)
-    }
-    
     loadData()
-
-    return () => { isMounted = false }
   }, [patientId])
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    try {
+      await apiPost(`/iot/sync-patient/${patientId}`, {})
+      loadData() // Recargar los signos vitales
+    } catch (err) {
+      console.error('Error sincronizando', err)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   const handleAssignDevice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,34 +130,44 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
         </header>
 
         <div className='grid gap-6 md:grid-cols-2'>
-          {/* Panel IoT */}
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
-            <div className='flex items-center justify-between mb-4'>
-              <h2 className='text-xl font-semibold text-slate-900 flex items-center gap-2'>
-                <Activity className='text-[#3C6E71]' />
-                Dispositivos IoT Activos
-              </h2>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className='flex items-center gap-1 bg-[#3C6E71] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#2A4D4F] transition'
-              >
-                <Plus className='size-4' /> Vincular
-              </button>
+          {/* PANEL IOT */}
+          <div className='rounded-2xl border border-slate-200 bg-slate-800 p-6 shadow-sm flex-1'>
+            <div className='mb-4 flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Activity className='h-5 w-5 text-[#3C6E71]' />
+                <h3 className='font-bold text-lg text-slate-100'>Dispositivos IoT Activos</h3>
+              </div>
+              <div className='flex gap-2'>
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className='flex items-center gap-1 bg-slate-700 text-slate-100 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-600 disabled:opacity-50 transition-colors'
+                >
+                  {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+                </button>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className='flex items-center gap-1 bg-[#3C6E71] text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#2F5658] transition-colors'
+                >
+                  <Plus className='h-4 w-4' />
+                  Vincular
+                </button>
+              </div>
             </div>
             
             {devices.length === 0 ? (
-              <div className='bg-slate-50 rounded-xl p-4 border border-slate-200 text-center'>
-                <p className='text-sm text-slate-500'>No hay dispositivos vinculados.</p>
+              <div className='bg-black/10 rounded-xl p-4 border border-slate-600/30 text-center'>
+                <p className='text-sm text-slate-400'>No hay dispositivos vinculados.</p>
               </div>
             ) : (
               <div className='space-y-3'>
                 {devices.map(dev => (
-                  <div key={dev.id} className='bg-[#F4F9F9] rounded-xl p-4 border border-[#CDE7EA] flex justify-between items-center'>
+                  <div key={dev.id} className='bg-black/10 rounded-xl p-4 border border-slate-600/30 flex justify-between items-center'>
                     <div>
-                      <p className='text-sm text-slate-800 font-bold'>{dev.sensorType.toUpperCase()}</p>
-                      <p className='text-xs text-slate-500 mt-1'>Asset: {dev.assetId} | Sensor: {dev.sensorId}</p>
+                      <p className='text-sm text-slate-200 font-bold'>{dev.sensorType.toUpperCase()}</p>
+                      <p className='text-xs text-slate-400 mt-1'>Asset: {dev.assetId} | Sensor: {dev.sensorId}</p>
                     </div>
-                    <span className='px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold uppercase rounded-md'>
+                    <span className='px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-bold uppercase rounded-md border border-green-500/30'>
                       Activo
                     </span>
                   </div>
