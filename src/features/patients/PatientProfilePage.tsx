@@ -18,7 +18,7 @@ type MedicionRow = {
   origen: string
   variableClinica?: {
     nombre: string
-    unidadMedida: string
+    unidad: string
   }
 }
 
@@ -46,7 +46,8 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
   const [alertas, setAlertas] = useState<AlertaRow[]>([])
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  
+  const [isSyncing, setIsSyncing] = useState(false)
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [assetId, setAssetId] = useState('')
@@ -175,11 +176,11 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
               </div>
             )}
             
-            <h3 className='text-md font-semibold text-slate-800 mt-6 mb-3 flex items-center gap-2'>
+            <h3 className='text-md font-semibold text-slate-100 mt-6 mb-3 flex items-center gap-2'>
               <AlertTriangle className='text-amber-500 size-4' /> Alertas IoT Recientes
             </h3>
             {alertas.length === 0 ? (
-              <p className='text-sm text-slate-500'>No hay alertas registradas.</p>
+              <p className='text-sm text-slate-400'>No hay alertas registradas.</p>
             ) : (
               <div className='space-y-3'>
                 {alertas.slice(0, 5).map(alerta => (
@@ -222,7 +223,7 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
                         <td className='px-4 py-3'>{new Date(m.fechaMedicion).toLocaleString()}</td>
                         <td className='px-4 py-3'>{m.variableClinica?.nombre}</td>
                         <td className='px-4 py-3 font-semibold'>
-                          {m.valorNumero} {m.variableClinica?.unidadMedida}
+                          {m.valorNumero} {m.variableClinica?.unidad}
                         </td>
                         <td className='px-4 py-3'>
                           {m.origen === 'IOT' ? (

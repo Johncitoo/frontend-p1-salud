@@ -120,6 +120,18 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setPlantillaFichaId(activePlantillas[0].id)
         }
 
+        const loadPacienteContextForVisita = async (visId: string) => {
+          try {
+            const visita = await apiGet<VisitaOptionRow>(`/visitas/${visId}`)
+            if (cancelled) return
+            setPacienteId(visita.pacienteId)
+            setVisitas([visita])
+          } catch {
+            // No bloquea el guardado; los selectores (deshabilitados en este modo)
+            // solo quedarian mostrando el placeholder en vez del paciente/visita real.
+          }
+        }
+
         const applyFicha = async (ficha: FichaClinicaRow) => {
           if (cancelled) return
 
@@ -127,6 +139,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setCurrentVersion(ficha.version)
           setFichaEstado(ficha.estado)
           setCreatedFichaId(current => current ?? ficha.id)
+          await loadPacienteContextForVisita(ficha.visitaId)
 
           if (ficha.plantillaFichaId) {
             setPlantillaFichaId(ficha.plantillaFichaId)
@@ -153,6 +166,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
         } else if (propVisitaId) {
           // Modo creación desde visita. Si la visita ya tiene ficha, se continúa esa ficha.
           setVisitaId(propVisitaId)
+          await loadPacienteContextForVisita(propVisitaId)
           const existing = await apiGet<FichaClinicaRow[]>(`/fichas-clinicas?visitaId=${propVisitaId}`)
           if (cancelled) return
           if (existing[0]) await applyFicha(existing[0])
