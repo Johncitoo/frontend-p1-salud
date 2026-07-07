@@ -69,12 +69,13 @@ const MOCK_PROTOCOLOS: Record<string, string[]> = {
   ]
 };
 
-// Alergias y medicación actual: backend-p1-salud no tiene ninguna entidad para esto
-// todavía (ni endpoint ni columna en Paciente), así que no hay dato real que mostrar.
-// En vez de fabricar contenido por paciente, se muestra siempre este aviso honesto.
-const SIN_DATOS_ALERGIAS_MEDICACION = {
+// Alergias: backend-p1-salud no tiene ninguna entidad para esto todavía (ni
+// endpoint ni columna en Paciente), así que no hay dato real que mostrar. En vez
+// de fabricar contenido por paciente, se muestra siempre este aviso honesto.
+// (Los medicamentos sí tienen entidad propia ahora — ver src/medicamentos/ en
+// el backend — y se editan directamente en la pestaña "Historial".)
+const SIN_DATOS_ALERGIAS = {
   alergias: ["Sin datos disponibles: el backend aún no registra alergias por paciente."],
-  actuales: ["Sin datos disponibles: el backend aún no registra medicación por paciente."],
 };
 
 function calcularEdad(fechaNacimiento?: string | null): string {
@@ -92,20 +93,20 @@ function calcularEdad(fechaNacimiento?: string | null): string {
 interface VisitDetailScreenProps {
   visita: any;
   plantillas: any[];
+  catalogoMedicamentos?: any[];
   onBack: () => void;
   onUpdateVisitaState: (visitaId: string, nuevoEstado: string, datosConsulta?: any) => void;
-  onRegisterAttention: (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => Promise<void>;
+  onRegisterAttention: (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'DIAGNOSTICO' | 'MEDICAMENTO', visitaId: string, data: any) => Promise<void>;
   onScheduleFollowUp: (visitaBase: any) => void;
 }
 
-export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdateVisitaState, onRegisterAttention, onScheduleFollowUp }: VisitDetailScreenProps) {
+export default function VisitDetailScreen({ visita, plantillas, catalogoMedicamentos, onBack, onUpdateVisitaState, onRegisterAttention, onScheduleFollowUp }: VisitDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<'DOMICILIO' | 'HISTORIAL' | 'CONSULTA'>('DOMICILIO');
   const [estadoVisita, setEstadoVisita] = useState(visita.estado);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
 
   // Control de Modales de Alergias, Medicación y Firma
   const [showAllergiesModal, setShowAllergiesModal] = useState(false);
-  const [showMedsModal, setShowMedsModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
 
   // Estados del Formulario de Firma
@@ -130,6 +131,25 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [observaciones, setObservaciones] = useState("");
 
+  // Diagnóstico y medicamentos: se registran en la pestaña "Historial" (no en
+  // "Consulta") y viajan a tablas propias (diagnosticos, medicamentos) en
+  // backend-p1-salud, independientes de la ficha clínica.
+  const [diagnostico, setDiagnostico] = useState("");
+  const [medicamentos, setMedicamentos] = useState<
+    Array<{ medicamentoCatalogoId: string; nombre: string; cantidadCajas: number }>
+  >([]);
+
+  // Catálogo de medicamentos para el selector (combobox + contador de cajas):
+  // viene siempre de la tabla real `medicamentos_catalogo`, importada a Dexie
+  // por syncService.descargarDatosDelDia. Sin mock: si todavía no se ha
+  // sincronizado nunca, la lista queda vacía y el picker lo indica.
+  // Se ordena acá porque Dexie devuelve las filas en orden de id (UUID), no en
+  // el orden alfabético que ya trae el backend.
+  const catalogoMedicamentosList = [...(catalogoMedicamentos ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const [showMedicamentoPicker, setShowMedicamentoPicker] = useState(false);
+  const [medicamentoSeleccionado, setMedicamentoSeleccionado] = useState<{ id: string; nombre: string; presentacion?: string | null } | null>(null);
+  const [cantidadCajas, setCantidadCajas] = useState(1);
+
   // Checklist de protocolos clínicos
   const [protocolChecked, setProtocolChecked] = useState<Record<number, boolean>>({});
 
@@ -140,6 +160,11 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReadingSensor, setIsReadingSensor] = useState(false);
+
+  // Signos vitales del kit portátil de sensores IoT (Proyecto 8), obtenidos
+  // automáticamente al hacer check-in. { codigoVariable: valor }, ej.
+  // { frecuencia_cardiaca: 74, saturacion_oxigeno: 96, ... }.
+  const [signosVitalesIot, setSignosVitalesIot] = useState<Record<string, number>>({});
 
   // Detalle real del paciente (dirección/referencia, cuidador, plan de cuidado,
   // historial de mediciones), traído de backend-p1-salud. Reemplaza el mock anterior.
@@ -156,6 +181,18 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
 
   // Buscar objeto de plantilla actual
   const currentTemplate = templatesList.find(p => p.id === selectedTemplateId) || templatesList[0] || MOCK_PLANTILLAS[0];
+
+  // ¿Esta plantilla tiene algún campo que se pueda auto-completar con un
+  // sensor IoT? Cubre tanto los códigos de las plantillas mock/offline como
+  // el código de variable clínica real de las plantillas sincronizadas.
+  const CODIGOS_CON_SENSOR = new Set([
+    'temperatura', 'saturacion', 'sat_pre', 'sat_post', 'pulso', 'presion',
+    'saturacion_oxigeno', 'frecuencia_cardiaca',
+    'presion_arterial_sistolica', 'presion_arterial_diastolica', 'glicemia_capilar',
+  ]);
+  const tieneCamposDeSensor = currentTemplate.campos.some((c: any) =>
+    CODIGOS_CON_SENSOR.has(c.codigo) || (c.variableCodigo && CODIGOS_CON_SENSOR.has(c.variableCodigo))
+  );
   const listadoProtocolos = MOCK_PROTOCOLOS[currentTemplate.codigo] || [
     "Verificar identidad del paciente.",
     "Lavar manos antes del procedimiento.",
@@ -207,71 +244,67 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
       : { objetivo: "No hay plan de cuidado registrado", descripcion: "", estado: "N/A" },
   };
 
-  // Alergias y medicación actual: sin respaldo en el backend todavía (ver constante arriba).
-  const historialFarmacologico = SIN_DATOS_ALERGIAS_MEDICACION;
+  // Alergias: sin respaldo en el backend todavía (ver constante arriba).
+  const historialFarmacologico = SIN_DATOS_ALERGIAS;
 
-  // Llamar al endpoint del sensor del Proyecto 8 (Consumo de API Real + Mocks de contingencia)
+  // Trae la última lectura real de los sensores IoT (Proyecto 8) asignados a
+  // este paciente y actualiza signosVitalesIot; el useEffect de auto-completado
+  // se encarga de volcar los valores a los campos vacíos del formulario.
   const handleLeerSensores = async () => {
+    if (!visita.pacienteId) return;
     setIsReadingSensor(true);
     try {
-      const response = await fetch(`https://api-proyecto8-sensores.com/api/sensado?rut=${detallesClinicos.rut}`);
-      if (!response.ok) throw new Error("Fallo de conexión");
-      const sensorData = await response.json();
-
-      setFormData(prev => ({
-        ...prev,
-        temperatura: sensorData.temperatura ? sensorData.temperatura.toString() : prev.temperatura,
-        saturacion: sensorData.saturacion ? sensorData.saturacion.toString() : prev.saturacion,
-        pulso: sensorData.pulso ? sensorData.pulso.toString() : prev.pulso,
-        sat_pre: sensorData.saturacion ? sensorData.saturacion.toString() : prev.sat_pre,
-      }));
-
-      Alert.alert("Sensor Conectado", "Los signos vitales han sido capturados con éxito del endpoint del Proyecto 8.");
-    } catch (error) {
-      // Mock de error interactivo en el Frontend (Requisito de Testing para Mocks de contingencia)
-      Alert.alert(
-        "Error de Dispositivo / Sin Conexión",
-        "No se pudo conectar al endpoint del sensor. ¿Deseas simular una respuesta de pruebas?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Simular Lectura Normal (OK)",
-            onPress: () => {
-              setFormData(prev => ({
-                ...prev,
-                presion: "120/80",
-                temperatura: "36.6",
-                saturacion: "98",
-                pulso: "72",
-                sat_pre: "95"
-              }));
-              Alert.alert("Lectura Simulada", "Signos vitales cargados con éxito (Paciente Estable).");
-            }
-          },
-          {
-            text: "Simular Alerta Crítica (Fuera de Rango)",
-            onPress: () => {
-              setFormData(prev => ({
-                ...prev,
-                presion: "145/95",
-                temperatura: "39.2",
-                saturacion: "87", // Hipoxia
-                pulso: "115", // Taquicardia
-                sat_pre: "87"
-              }));
-              Alert.alert(
-                "⚠️ ALERTA DE RIESGO CLÍNICO",
-                "Signos vitales fuera de límites aceptables: Fiebre Alta (39.2°C) e Hipoxia severa (87%). Reporte de inmediato.",
-                [{ text: "Entendido" }]
-              );
-            }
-          }
-        ]
-      );
+      const vitales = await syncService.obtenerSignosVitalesIoT(visita.pacienteId);
+      setSignosVitalesIot(vitales);
+      if (Object.keys(vitales).length === 0) {
+        Alert.alert("Sin lecturas", "No se encontraron lecturas de sensores para este paciente.");
+      }
     } finally {
       setIsReadingSensor(false);
     }
   };
+
+  // Traduce los campos de una plantilla al valor de sensor correspondiente.
+  // Prioriza variableCodigo (plantillas reales, ligadas al catálogo de
+  // variables clínicas); si no existe, usa alias conocidos por el código
+  // local del campo (para las plantillas mock de demo/offline).
+  const IOT_FIELD_ALIASES: Record<string, string> = {
+    temperatura: 'temperatura',
+    saturacion: 'saturacion_oxigeno',
+    sat_pre: 'saturacion_oxigeno',
+    sat_post: 'saturacion_oxigeno',
+    pulso: 'frecuencia_cardiaca',
+  };
+
+  const resolverValorSensor = (campo: any, vitales: Record<string, number>): string | undefined => {
+    if (campo.codigo === 'presion') {
+      const sistolica = vitales['presion_arterial_sistolica'];
+      const diastolica = vitales['presion_arterial_diastolica'];
+      return sistolica != null && diastolica != null ? `${sistolica}/${diastolica}` : undefined;
+    }
+    const clave = campo.variableCodigo || IOT_FIELD_ALIASES[campo.codigo];
+    const valor = clave ? vitales[clave] : undefined;
+    return valor != null ? String(valor) : undefined;
+  };
+
+  // Auto-completa con los sensores IoT solo los campos que el profesional
+  // todavía no llenó (no pisa lo que ya se escribió a mano).
+  useEffect(() => {
+    if (!selectedTemplateId || Object.keys(signosVitalesIot).length === 0) return;
+    setFormData(prev => {
+      let cambio = false;
+      const next = { ...prev };
+      for (const campo of currentTemplate.campos) {
+        if (next[campo.codigo]) continue;
+        const auto = resolverValorSensor(campo, signosVitalesIot);
+        if (auto !== undefined) {
+          next[campo.codigo] = auto;
+          cambio = true;
+        }
+      }
+      return cambio ? next : prev;
+    });
+  }, [selectedTemplateId, signosVitalesIot]);
 
   // Captura real de foto con expo-image-picker. El archivo local queda referenciado en
   // currentFotoUrl/currentFotoMimeType; la subida real al backend (POST
@@ -401,6 +434,21 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     Alert.alert("Ficha Enviada", `Se han registrado/actualizado los datos de "${currentTemplate.nombre}" para esta consulta.`);
   };
 
+  const handleAgregarMedicamento = () => {
+    if (!medicamentoSeleccionado || cantidadCajas < 1) return;
+    setMedicamentos(prev => [...prev, {
+      medicamentoCatalogoId: medicamentoSeleccionado.id,
+      nombre: medicamentoSeleccionado.nombre,
+      cantidadCajas,
+    }]);
+    setMedicamentoSeleccionado(null);
+    setCantidadCajas(1);
+  };
+
+  const handleQuitarMedicamento = (idx: number) => {
+    setMedicamentos(prev => prev.filter((_, i) => i !== idx));
+  };
+
   // Manejar el cambio de estado de la visita (Simulando GPS)
   // No hay GPS real (expo-location) todavía, pero la dirección como texto alcanza
   // para delegarle la navegación a Google Maps en vez de mostrar un mapa propio.
@@ -432,15 +480,25 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     // y es preferible no mandar lat/long sin GPS real.
     await onRegisterAttention('CHECK_IN', visita.id, {});
 
+    // Auto-completado de signos vitales: reclama el kit portátil de sensores
+    // IoT (Proyecto 8) para este paciente y trae su última lectura. Best-effort
+    // (obtenerSignosVitalesIoT nunca lanza), así que no bloquea el check-in si
+    // el paciente no tiene sensores o el servicio externo falla.
+    if (visita.pacienteId) {
+      syncService.obtenerSignosVitalesIoT(visita.pacienteId).then(setSignosVitalesIot);
+    }
+
     setActiveTab("CONSULTA"); // Llevar directo a la consulta tras el check-in
   };
 
-  // Pre-Finalizar: ejecuta validaciones y abre modal de firma
+  // Pre-Finalizar: ejecuta validaciones y abre modal de firma. El cierre de la
+  // atención ahora se gatilla desde "Historial" (diagnóstico) y no depende de
+  // haber llenado una ficha en "Consulta" (esa sigue siendo opcional).
   const handlePreFinalizar = () => {
-    if (fichasCompletadas.length === 0) {
+    if (!diagnostico.trim()) {
       Alert.alert(
-        "Faltan Fichas Clínicas",
-        "Por favor completa y guarda al menos una ficha (presionando el botón '💾 Guardar esta Ficha') antes de finalizar la atención general.",
+        "Falta el Diagnóstico",
+        "Ingresa el diagnóstico del paciente en la pestaña 'Historial' antes de finalizar la atención.",
         [{ text: "Entendido" }]
       );
       return;
@@ -468,7 +526,11 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
       // 1. Encolar Check-out (sin coordenadas; ver nota en handleCheckIn)
       await onRegisterAttention('CHECK_OUT', visita.id, {});
 
-      // 2. Encolar cada una de las fichas completadas
+      // 2. Encolar cada una de las fichas completadas. backend-p1-salud solo
+      // admite UNA ficha clínica por visita (ver ConflictException en
+      // fichas-clinicas.service.ts): si se completó más de una plantilla, solo
+      // la primera persiste y el resto choca con un 409 (limitación preexistente,
+      // no introducida acá).
       for (const ficha of fichasCompletadas) {
         await onRegisterAttention('FICHA_CLINICA', visita.id, {
           plantillaFichaId: ficha.plantillaId,
@@ -482,6 +544,17 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
             rut: signerRut,
             firma_token: "HASH_MOCK_SIGNATURE_" + Date.now(),
           }
+        });
+      }
+
+      // 3. Encolar diagnóstico y medicamentos: viven en tablas propias
+      // (diagnosticos, medicamentos), independientes de fichas_clinicas, así que
+      // admiten múltiples registros por visita sin chocar con esa limitación.
+      await onRegisterAttention('DIAGNOSTICO', visita.id, { descripcion: diagnostico });
+      for (const medicamento of medicamentos) {
+        await onRegisterAttention('MEDICAMENTO', visita.id, {
+          medicamentoCatalogoId: medicamento.medicamentoCatalogoId,
+          cantidadCajas: medicamento.cantidadCajas,
         });
       }
 
@@ -576,7 +649,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
           <HStack align="center" gap="xs">
             <ClipboardList size={16} color={activeTab === 'HISTORIAL' ? theme.colors.yaleBlue : theme.colors.grayText} />
             <Label variant="caption" style={{ fontWeight: activeTab === 'HISTORIAL' ? 'bold' : 'normal' }} color={activeTab === 'HISTORIAL' ? theme.colors.yaleBlue : theme.colors.grayText}>
-              Historial
+              Diagnóstico
             </Label>
           </HStack>
         </TouchableOpacity>
@@ -679,7 +752,7 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
         {activeTab === 'HISTORIAL' && (
           <VStack gap="md">
 
-            {/* ACCESO RÁPIDO A MEDICACIÓN Y ALERGIAS */}
+            {/* ACCESO RÁPIDO A ALERGIAS (solo lectura; sin respaldo real en el backend) */}
             <HStack gap="sm" width="100%">
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -690,17 +763,121 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   🚫 Alergias Médicas
                 </Label>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[styles.actionBadgeButton, { backgroundColor: '#EBF3F6', borderColor: '#BCE3EB' }]}
-                onPress={() => setShowMedsModal(true)}
-              >
-                <Label variant="caption" color={theme.colors.yaleBlue} style={{ fontWeight: 'bold', fontSize: 13 }}>
-                  💊 Medicación Actual
-                </Label>
-              </TouchableOpacity>
             </HStack>
+
+            {/* Diagnóstico y Medicamentos: se registran acá (no en "Consulta") y
+                viajan dentro del contenido jsonb de la única ficha clínica que
+                admite backend-p1-salud por visita. */}
+            <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
+              <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 8 }}>Diagnóstico y Medicamentos</Label>
+
+              <Label variant="caption" style={styles.inputLabel}>Diagnóstico {estadoVisita === "EN_ATENCION" ? '*' : ''}</Label>
+              <TextInput
+                style={styles.textArea}
+                multiline
+                numberOfLines={3}
+                placeholder="Ej: Hipertensión arterial descompensada"
+                value={diagnostico}
+                onChangeText={setDiagnostico}
+                placeholderTextColor={theme.colors.grayText}
+                editable={estadoVisita === "EN_ATENCION"}
+              />
+
+              <View style={styles.separator} />
+
+              <Label variant="caption" style={styles.inputLabel}>💊 Medicamentos</Label>
+
+              {medicamentos.length === 0 ? (
+                <Label variant="body" color={theme.colors.grayText} style={{ marginBottom: 8 }}>
+                  No hay medicamentos registrados para esta atención.
+                </Label>
+              ) : (
+                <VStack gap="xs" style={{ marginBottom: 8 }}>
+                  {medicamentos.map((med, idx) => (
+                    <HStack key={idx} justify="space-between" align="center" bg="#EBF3F6" padding="sm" radius="sm">
+                      <Label variant="body" color={theme.colors.yaleBlue} style={{ flex: 1, fontWeight: '500' }}>
+                        • {med.nombre} — {med.cantidadCajas} caja{med.cantidadCajas === 1 ? '' : 's'}
+                      </Label>
+                      {estadoVisita === "EN_ATENCION" && (
+                        <TouchableOpacity onPress={() => handleQuitarMedicamento(idx)} activeOpacity={0.7}>
+                          <Label variant="body" color={theme.colors.danger} style={{ fontWeight: 'bold', paddingHorizontal: 8 }}>
+                            ✕
+                          </Label>
+                        </TouchableOpacity>
+                      )}
+                    </HStack>
+                  ))}
+                </VStack>
+              )}
+
+              {estadoVisita === "EN_ATENCION" && (
+                <VStack gap="sm">
+                  <TouchableOpacity
+                    style={styles.medSelectorBox}
+                    onPress={() => setShowMedicamentoPicker(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Label
+                      variant="body"
+                      color={medicamentoSeleccionado ? theme.colors.graphite : theme.colors.grayText}
+                      style={{ flex: 1 }}
+                    >
+                      {medicamentoSeleccionado
+                        ? `${medicamentoSeleccionado.nombre}${medicamentoSeleccionado.presentacion ? ` (${medicamentoSeleccionado.presentacion})` : ''}`
+                        : 'Toca para elegir un medicamento del catálogo'}
+                    </Label>
+                    <Label variant="body" color={theme.colors.grayText}>▾</Label>
+                  </TouchableOpacity>
+
+                  <HStack gap="sm" align="center" justify="space-between">
+                    <HStack gap="sm" align="center">
+                      <Label variant="caption" style={{ fontWeight: '600', color: theme.colors.graphite }}>
+                        Cantidad de cajas:
+                      </Label>
+                      <TouchableOpacity
+                        style={styles.stepperButton}
+                        onPress={() => setCantidadCajas(c => Math.max(1, c - 1))}
+                        activeOpacity={0.7}
+                      >
+                        <Label variant="body" color={theme.colors.yaleBlue} style={{ fontWeight: 'bold' }}>−</Label>
+                      </TouchableOpacity>
+                      <Label variant="body" style={{ fontWeight: 'bold', minWidth: 24, textAlign: 'center' }}>
+                        {cantidadCajas}
+                      </Label>
+                      <TouchableOpacity
+                        style={styles.stepperButton}
+                        onPress={() => setCantidadCajas(c => c + 1)}
+                        activeOpacity={0.7}
+                      >
+                        <Label variant="body" color={theme.colors.yaleBlue} style={{ fontWeight: 'bold' }}>+</Label>
+                      </TouchableOpacity>
+                    </HStack>
+
+                    <TouchableOpacity
+                      style={[styles.addMedButton, !medicamentoSeleccionado && { opacity: 0.5 }]}
+                      onPress={handleAgregarMedicamento}
+                      disabled={!medicamentoSeleccionado}
+                      activeOpacity={0.7}
+                    >
+                      <Label variant="body" color={theme.colors.white} style={{ fontWeight: 'bold' }}>
+                        + Agregar
+                      </Label>
+                    </TouchableOpacity>
+                  </HStack>
+                </VStack>
+              )}
+            </Box>
+
+            {/* Botón de Cierre General de Consulta: vive acá y no en "Consulta". */}
+            {estadoVisita === "EN_ATENCION" && (
+              <PrimaryButton
+                isLoading={isLoading}
+                onPress={handlePreFinalizar}
+                style={{ height: 46 }}
+              >
+                🏁 Finalizar Consulta y Registrar Check-Out
+              </PrimaryButton>
+            )}
 
             {/* Plan de Cuidado Longitudinal */}
             <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
@@ -834,14 +1011,22 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                 <Box bg={theme.colors.white} radius="md" padding="md" style={styles.cardInfo}>
 
                   {/* BOTÓN CAPTURA DE SENSORES (PROYECTO 8) */}
-                  {(selectedTemplateId === "p1" || selectedTemplateId === "p3") && estadoVisita !== "REALIZADA" && (
-                    <SecondaryButton
-                      isLoading={isReadingSensor}
-                      style={{ marginBottom: 16, backgroundColor: theme.colors.stormyTeal }}
-                      onPress={handleLeerSensores}
-                    >
-                      🔌 Capturar desde Sensor (Proyecto 8)
-                    </SecondaryButton>
+                  {tieneCamposDeSensor && estadoVisita !== "REALIZADA" && (
+                    <VStack gap="xs" style={{ marginBottom: 16 }}>
+                      <SecondaryButton
+                        isLoading={isReadingSensor}
+                        style={{ backgroundColor: theme.colors.stormyTeal }}
+                        textColor={theme.colors.white}
+                        onPress={handleLeerSensores}
+                      >
+                        📡 Actualizar desde Sensores (Proyecto 8)
+                      </SecondaryButton>
+                      {Object.keys(signosVitalesIot).length > 0 && (
+                        <Label variant="caption" color={theme.colors.success}>
+                          📡 Signos vitales auto-completados desde el sensor. Puedes editarlos si es necesario.
+                        </Label>
+                      )}
+                    </VStack>
                   )}
 
                   <Label variant="h2" color={theme.colors.yaleBlue} style={{ marginBottom: 12 }}>
@@ -1033,28 +1218,18 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
                   </Box>
                 )}
 
-                {/* Botones de Guardado y Cierre */}
+                {/* Botón de Guardado Individual de Ficha. El cierre de la consulta
+                    (Check-Out) ahora vive en la pestaña "Historial", junto al
+                    diagnóstico y los medicamentos. */}
                 {estadoVisita === "EN_ATENCION" && (
-                  <VStack gap="xs" style={{ paddingVertical: 8 }}>
-                    {/* Botón de Guardado Individual de Ficha */}
-                    <SecondaryButton
-                      onPress={handleMandarFicha}
-                      style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success, height: 46 }}
-                    >
-                      <Label variant="caption" color={theme.colors.white} style={{ fontWeight: 'bold' }}>
-                        💾 Mandar Ficha a esta Consulta ({currentTemplate.nombre})
-                      </Label>
-                    </SecondaryButton>
-
-                    {/* Botón de Cierre General de Consulta */}
-                    <PrimaryButton
-                      isLoading={isLoading}
-                      onPress={handlePreFinalizar}
-                      style={{ height: 46, marginTop: 4 }}
-                    >
-                      🏁 Finalizar Consulta y Registrar Check-Out
-                    </PrimaryButton>
-                  </VStack>
+                  <SecondaryButton
+                    onPress={handleMandarFicha}
+                    style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success, height: 46 }}
+                  >
+                    <Label variant="caption" color={theme.colors.white} style={{ fontWeight: 'bold' }}>
+                      💾 Mandar Ficha a esta Consulta ({currentTemplate.nombre})
+                    </Label>
+                  </SecondaryButton>
                 )}
               </VStack>
             )}
@@ -1096,37 +1271,50 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
         </View>
       </Modal>
 
-      {/* MODAL 2: MEDICACIÓN ACTUAL */}
+      {/* MODAL 2: SELECTOR DE MEDICAMENTO (COMBOBOX DEL CATÁLOGO) */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={showMedsModal}
-        onRequestClose={() => setShowMedsModal(false)}
+        visible={showMedicamentoPicker}
+        onRequestClose={() => setShowMedicamentoPicker(false)}
       >
         <View style={styles.modalOverlay}>
           <Box bg={theme.colors.white} radius="lg" padding="lg" style={styles.modalContent}>
             <VStack gap="md">
-              <Label variant="h2" color={theme.colors.yaleBlue}>💊 Medicación Actual</Label>
-              <Label variant="caption">Lista de fármacos que el paciente toma actualmente de forma regular.</Label>
-
-              <ScrollView style={{ maxHeight: 200, marginTop: 8 }}>
+              <Label variant="h2" color={theme.colors.yaleBlue}>💊 Elegir Medicamento</Label>
+              {catalogoMedicamentosList.length === 0 && (
+                <Label variant="body" color={theme.colors.grayText}>
+                  No hay medicamentos disponibles todavía. Sincroniza la app (pestaña Itinerario) para descargar el catálogo.
+                </Label>
+              )}
+              <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
                 <VStack gap="xs">
-                  {historialFarmacologico.actuales.map((item, idx) => (
-                    <Box key={idx} bg="#EBF3F6" padding="sm" radius="sm">
-                      <Label variant="body" color={theme.colors.yaleBlue} style={{ fontWeight: '500' }}>
-                        • {item}
+                  {catalogoMedicamentosList.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.medPickerRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setMedicamentoSeleccionado(item);
+                        setShowMedicamentoPicker(false);
+                      }}
+                    >
+                      <Label variant="body" style={{ fontWeight: '600', color: theme.colors.graphite }}>
+                        {item.nombre}
                       </Label>
-                    </Box>
+                      {!!item.presentacion && (
+                        <Label variant="caption" color={theme.colors.grayText}>
+                          {item.presentacion}
+                        </Label>
+                      )}
+                    </TouchableOpacity>
                   ))}
                 </VStack>
               </ScrollView>
 
-              <PrimaryButton
-                style={{ marginTop: 12 }}
-                onPress={() => setShowMedsModal(false)}
-              >
-                Cerrar Ventana
-              </PrimaryButton>
+              <OutlineButton onPress={() => setShowMedicamentoPicker(false)}>
+                Cancelar
+              </OutlineButton>
             </VStack>
           </Box>
         </View>
@@ -1311,6 +1499,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xs,
+  },
+  addMedButton: {
+    height: 44,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.yaleBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medSelectorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 46,
+    borderWidth: 1,
+    borderColor: theme.colors.alabasterGrey,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.colors.white,
+  },
+  stepperButton: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.alabasterGrey,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9F9F9',
+  },
+  medPickerRow: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   modalOverlay: {
     flex: 1,

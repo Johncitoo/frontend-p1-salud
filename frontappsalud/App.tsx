@@ -9,6 +9,7 @@ import ItineraryScreen from './src/screens/ItineraryScreen';
 import VisitDetailScreen from './src/screens/VisitDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { db } from './src/database/offlineDb';
+import { hydrateFromSnapshot } from './src/database/offlineDbPersistence';
 import { Calendar, Settings } from 'lucide-react-native';
 
 import { syncService } from './src/services/syncService';
@@ -17,11 +18,17 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'LOGIN' | 'ITINERARY' | 'VISIT_DETAIL' | 'SETTINGS'>('LOGIN');
   const [visitas, setVisitas] = useState<any[]>([]);
   const [plantillas, setPlantillas] = useState<any[]>([]);
+  const [catalogoMedicamentos, setCatalogoMedicamentos] = useState<any[]>([]);
   const [selectedVisitaId, setSelectedVisitaId] = useState<string | null>(null);
   const [profesionalNombre, setProfesionalNombre] = useState<string | undefined>(undefined);
 
   // Estado de red global
   const [isOnline, setIsOnline] = useState(true);
+
+  // fake-indexeddb (usado porque RN no tiene IndexedDB real) es solo en memoria:
+  // si no esperamos a restaurar el snapshot en disco antes de la primera lectura,
+  // un reinicio de la app parece haber "perdido" todos los datos offline.
+  const [dbReady, setDbReady] = useState(false);
 
   const handleDescargarDatos = async () => {
     try {
@@ -34,21 +41,25 @@ export default function App() {
       }
       const localVisitas = await db.visitas.toArray();
       const localPlantillas = await db.plantillas.toArray();
+      const localCatalogoMedicamentos = await db.catalogoMedicamentos.toArray();
 
       setVisitas(localVisitas);
       setPlantillas(localPlantillas);
+      setCatalogoMedicamentos(localCatalogoMedicamentos);
     } catch (err) {
       console.error("Fallo al descargar datos del backend:", err);
       // Sin conexión y sin nada previamente sincronizado: no hay datos reales que
       // mostrar, así que la lista queda vacía (la UI ya maneja el estado "sin visitas").
       const localVisitas = await db.visitas.toArray();
       const localPlantillas = await db.plantillas.toArray();
+      const localCatalogoMedicamentos = await db.catalogoMedicamentos.toArray();
       setVisitas(localVisitas);
       setPlantillas(localPlantillas);
+      setCatalogoMedicamentos(localCatalogoMedicamentos);
     }
   };
 
-  const handleRegistrarAtencion = async (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => {
+  const handleRegistrarAtencion = async (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'DIAGNOSTICO' | 'MEDICAMENTO', visitaId: string, data: any) => {
     try {
       await syncService.guardarAtencionLocal(tipo, visitaId, data);
       console.log(`Atención guardada localmente en Dexie: ${tipo} para visita ${visitaId}`);
@@ -73,17 +84,27 @@ export default function App() {
     }
   };
 
+  // Restaurar la cola/datos offline guardados en disco antes de que cualquier
+  // pantalla lea `db` (ver src/database/offlineDbPersistence.ts).
+  useEffect(() => {
+    hydrateFromSnapshot()
+      .catch(err => console.error('Error restaurando datos offline:', err))
+      .finally(() => setDbReady(true));
+  }, []);
+
   // Inicializar base de datos local y descargar datos dinámicos
   useEffect(() => {
+    if (!dbReady) return;
     handleDescargarDatos();
-  }, [isOnline]);
+  }, [isOnline, dbReady]);
 
   useEffect(() => {
+    if (!dbReady) return;
     if (!isOnline) return;
     intentarSincronizarPendientes();
     const interval = setInterval(intentarSincronizarPendientes, 20000);
     return () => clearInterval(interval);
-  }, [isOnline]);
+  }, [isOnline, dbReady]);
 
   const handleLoginSuccess = () => {
     setCurrentScreen('ITINERARY');
@@ -152,6 +173,7 @@ export default function App() {
             <VisitDetailScreen
               visita={selectedVisita}
               plantillas={plantillas}
+              catalogoMedicamentos={catalogoMedicamentos}
               onBack={() => setCurrentScreen('ITINERARY')}
               onUpdateVisitaState={handleUpdateVisitaState}
               onRegisterAttention={handleRegistrarAtencion}

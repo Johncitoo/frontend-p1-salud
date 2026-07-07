@@ -1,4 +1,4 @@
-import { db, LocalVisita, LocalPlantilla, SyncQueueItem } from '../database/offlineDb';
+import { db, LocalVisita, LocalPlantilla, LocalMedicamentoCatalogo, SyncQueueItem } from '../database/offlineDb';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getCurrentAccessToken } from './keycloakAuth';
 
@@ -106,7 +106,7 @@ export const syncService = {
    * 1. Descarga el itinerario de hoy y las plantillas de fichas desde backend-p1-salud
    * y las guarda en la base de datos local (IndexedDB).
    */
-  descargarDatosDelDia: async (): Promise<{ visitas: number; plantillas: number; profesional: { nombres: string; apellidos: string } | null }> => {
+  descargarDatosDelDia: async (): Promise<{ visitas: number; plantillas: number; catalogoMedicamentos: number; profesional: { nombres: string; apellidos: string } | null }> => {
     try {
       const fecha = hoyISO();
 
@@ -148,10 +148,22 @@ export const syncService = {
               obligatorio: !!c.obligatorio,
               placeholder: c.ayudaTexto ?? undefined,
               opciones: opcionesComoArray(c.opciones),
+              variableCodigo: c.tipoCampo === 'VARIABLE_CLINICA'
+                ? variablesPorId.get(c.variableClinicaId)?.codigo
+                : undefined,
             }));
           return { id: p.id, codigo: p.codigo, nombre: p.nombre, campos };
         }),
       );
+
+      // Catálogo de medicamentos, para el selector de la pestaña Historial.
+      const responseCatalogo = await fetch(`${API_BASE_URL}/medicamentos/catalogo`, { headers: authHeaders() });
+      const catalogoBase: any[] = responseCatalogo.ok ? await responseCatalogo.json() : [];
+      const apiCatalogoMedicamentos: LocalMedicamentoCatalogo[] = catalogoBase.map((c) => ({
+        id: c.id,
+        nombre: c.nombre,
+        presentacion: c.presentacion ?? null,
+      }));
 
       // Guardar en base de datos local (Sobrescribe / Actualiza registros)
       await db.visitas.clear();
@@ -160,9 +172,15 @@ export const syncService = {
       await db.plantillas.clear();
       await db.plantillas.bulkPut(apiPlantillas);
 
+      if (apiCatalogoMedicamentos.length > 0) {
+        await db.catalogoMedicamentos.clear();
+        await db.catalogoMedicamentos.bulkPut(apiCatalogoMedicamentos);
+      }
+
       return {
         visitas: apiVisitas.length,
         plantillas: apiPlantillas.length,
+        catalogoMedicamentos: apiCatalogoMedicamentos.length,
         profesional,
       };
     } catch (error) {
@@ -214,6 +232,31 @@ export const syncService = {
       .sort((a: any, b: any) => (a.fecha < b.fecha ? 1 : -1));
 
     return { paciente, direccionPrincipal, cuidador, planCuidado, historial };
+  },
+
+  /**
+   * Reclama el kit portátil de sensores IoT (Proyecto 8) para este paciente,
+   * y devuelve la última lectura de cada sensor mapeada a códigos de variable
+   * clínica (misma convención que IOT_VARIABLE_MAP en el backend), lista para
+   * auto-completar los campos de la ficha. Best-effort: si el paciente no
+   * tiene conexión o el servicio IoT falla, devuelve {} en vez de lanzar,
+   * para no bloquear el flujo de check-in.
+   */
+  obtenerSignosVitalesIoT: async (pacienteId: string): Promise<Record<string, number>> => {
+    try {
+      await fetch(`${API_BASE_URL}/iot/paciente-sensores/${pacienteId}/reclamar-kit`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const response = await fetch(`${API_BASE_URL}/iot/paciente-sensores/${pacienteId}/signos-vitales`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) return {};
+      return await response.json();
+    } catch (error) {
+      console.warn('No se pudieron obtener signos vitales IoT:', error);
+      return {};
+    }
   },
 
   /**
@@ -398,6 +441,35 @@ export const syncService = {
           });
           if (!alertaRes.ok) {
             console.error(`[SYNC DEBUG] POST /alertas falló`, alertaRes.status, await alertaRes.text());
+            fallidos++; continue;
+          }
+        } else if (item.tipo === 'DIAGNOSTICO') {
+          // Una visita admite múltiples diagnósticos (a diferencia de la ficha
+          // clínica, que backend-p1-salud limita a una por visita).
+          const diagnosticoRes = await fetch(`${API_BASE_URL}/diagnosticos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({
+              visitaId: item.visita_id,
+              descripcion: item.data?.descripcion,
+            }),
+          });
+          if (!diagnosticoRes.ok) {
+            console.error(`[SYNC DEBUG] POST /diagnosticos falló`, diagnosticoRes.status, await diagnosticoRes.text());
+            fallidos++; continue;
+          }
+        } else if (item.tipo === 'MEDICAMENTO') {
+          const medicamentoRes = await fetch(`${API_BASE_URL}/medicamentos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({
+              visitaId: item.visita_id,
+              medicamentoCatalogoId: item.data?.medicamentoCatalogoId,
+              cantidadCajas: item.data?.cantidadCajas,
+            }),
+          });
+          if (!medicamentoRes.ok) {
+            console.error(`[SYNC DEBUG] POST /medicamentos falló`, medicamentoRes.status, await medicamentoRes.text());
             fallidos++; continue;
           }
         }
