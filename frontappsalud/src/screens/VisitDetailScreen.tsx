@@ -94,7 +94,7 @@ interface VisitDetailScreenProps {
   plantillas: any[];
   onBack: () => void;
   onUpdateVisitaState: (visitaId: string, nuevoEstado: string, datosConsulta?: any) => void;
-  onRegisterAttention: (tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => Promise<void>;
+  onRegisterAttention: (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => Promise<void>;
   onScheduleFollowUp: (visitaBase: any) => void;
 }
 
@@ -412,9 +412,12 @@ export default function VisitDetailScreen({ visita, plantillas, onBack, onUpdate
     });
   };
 
-  const handleIniciarRuta = () => {
+  const handleIniciarRuta = async () => {
     setEstadoVisita("EN_CAMINO");
     onUpdateVisitaState(visita.id, "EN_CAMINO");
+    // Encola el cambio de estado para el backend, que dispara la notificación al
+    // paciente de "profesional en camino" (VisitasService.cambiarEstado).
+    await onRegisterAttention('EN_CAMINO', visita.id, {});
   };
 
   const handleCheckIn = async () => {

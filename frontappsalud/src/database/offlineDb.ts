@@ -36,7 +36,7 @@ export interface LocalPlantilla {
 
 export interface SyncQueueItem {
   id?: number;
-  tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'SOLICITUD_CONTINUIDAD';
+  tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'SOLICITUD_CONTINUIDAD';
   visita_id: string;
   data: any;
   timestamp: number;

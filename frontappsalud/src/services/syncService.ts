@@ -306,6 +306,18 @@ export const syncService = {
             console.error(`[SYNC DEBUG] PATCH estado/completar falló`, estadoRes.status, await estadoRes.text());
             fallidos++; continue;
           }
+        } else if (item.tipo === 'EN_CAMINO') {
+          // Dispara la notificación al paciente de "profesional en camino" (ver
+          // VisitasService.cambiarEstado en el backend). No requiere checkpoint.
+          const enCaminoRes = await fetch(`${API_BASE_URL}/visitas/${item.visita_id}/estado`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ estado: 'EN_CAMINO' }),
+          });
+          if (!enCaminoRes.ok) {
+            console.error(`[SYNC DEBUG] PATCH estado EN_CAMINO falló`, enCaminoRes.status, await enCaminoRes.text());
+            fallidos++; continue;
+          }
         } else if (item.tipo === 'FICHA_CLINICA') {
           const fichaRes = await fetch(`${API_BASE_URL}/fichas-clinicas`, {
             method: 'POST',

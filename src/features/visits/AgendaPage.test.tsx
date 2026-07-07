@@ -170,6 +170,16 @@ const findButton = (text: string) =>
   Array.from(document.body.querySelectorAll('button'))
     .find(button => button.textContent?.includes(text))
 
+const typeInto = async (element: HTMLTextAreaElement | HTMLInputElement | null, value: string) => {
+  if (!element) throw new Error('Elemento no encontrado')
+  const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
+  await act(async () => {
+    setter?.call(element, value)
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
 const findLabel = (text: string) =>
   Array.from(document.body.querySelectorAll('label'))
     .find(label => label.textContent?.includes(text))
@@ -242,18 +252,47 @@ describe('AgendaPage calendar flow', () => {
     }))
   })
 
-  it('cancela una visita desde la lista con confirmación explícita', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('cancela una visita desde la lista abriendo el modal de motivo', async () => {
     const rendered = await render(<AgendaPage />)
     mounted.push(rendered.root)
 
     await click(findButton('Lista'))
     await click(findButton('Cancelar'))
 
-    expect(window.confirm).toHaveBeenCalledWith('¿Cancelar esta visita?')
+    expect(document.body.textContent).toContain('Cancelar visita')
+    await click(findButton('Cancelar visita'))
+
     expect(mocks.apiPatch).toHaveBeenCalledWith(`/visitas/${visit.id}/cancelar`, {
       observacionCancelacion: 'Cancelada desde agenda',
     })
+  })
+
+  it('incluye el motivo escrito por el usuario al cancelar', async () => {
+    const rendered = await render(<AgendaPage />)
+    mounted.push(rendered.root)
+
+    await click(findButton('Lista'))
+    await click(findButton('Cancelar'))
+
+    const textarea = document.body.querySelector('textarea')
+    await typeInto(textarea, 'Paciente hospitalizado')
+    await click(findButton('Cancelar visita'))
+
+    expect(mocks.apiPatch).toHaveBeenCalledWith(`/visitas/${visit.id}/cancelar`, {
+      observacionCancelacion: 'Paciente hospitalizado',
+    })
+  })
+
+  it('no cancela si el usuario cierra el modal con "Volver"', async () => {
+    const rendered = await render(<AgendaPage />)
+    mounted.push(rendered.root)
+
+    await click(findButton('Lista'))
+    await click(findButton('Cancelar'))
+    await click(findButton('Volver'))
+
+    expect(document.body.textContent).not.toContain('Cancelar visita')
+    expect(mocks.apiPatch).not.toHaveBeenCalledWith(`/visitas/${visit.id}/cancelar`, expect.anything())
   })
 
   it('para profesional consulta Google Calendar y oculta formulario de creación', async () => {

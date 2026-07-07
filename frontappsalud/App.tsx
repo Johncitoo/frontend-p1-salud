@@ -48,7 +48,7 @@ export default function App() {
     }
   };
 
-  const handleRegistrarAtencion = async (tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => {
+  const handleRegistrarAtencion = async (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => {
     try {
       await syncService.guardarAtencionLocal(tipo, visitaId, data);
       console.log(`Atención guardada localmente en Dexie: ${tipo} para visita ${visitaId}`);
