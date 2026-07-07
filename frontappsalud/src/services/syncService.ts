@@ -1,16 +1,35 @@
-import { db, LocalVisita, LocalPlantilla, SyncQueueItem } from '../database/offlineDb';
+import { db, LocalVisita, LocalPlantilla, LocalMedicamentoCatalogo, SyncQueueItem } from '../database/offlineDb';
+import * as FileSystem from 'expo-file-system/legacy';
+import { getCurrentAccessToken } from './keycloakAuth';
 
-// backend-p1-salud (el backend oficial, con auth/auditoría). 10.0.2.2 es el loopback
-// al localhost del host desde el emulador de Android; para dispositivo físico o iOS
-// hay que apuntarlo a la IP real de la máquina que corre el backend.
-export const API_BASE_URL = 'http://10.0.2.2:3000';
+// backend-p1-salud (el backend oficial, con auth/auditoría). Se lee de la variable
+// de entorno EXPO_PUBLIC_API_URL (ver .env / .env.example) en vez de hardcodearse,
+// para poder cambiar de emulador a dispositivo físico sin tocar código.
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3000';
+
+// Modo de autenticación contra backend-p1-salud: 'mock' o 'keycloak' (debe coincidir
+// con AUTH_MODE del backend). Ver .env / .env.example.
+export const AUTH_MODE = process.env.EXPO_PUBLIC_AUTH_MODE ?? 'mock';
 
 // Identidad de modo mock (AUTH_MODE=mock en backend-p1-salud). Debe coincidir con el
 // identity_user_id que crea `npm run seed` (ver backend-p1-salud/src/database/seed.ts).
 // Esto NO es login real: reemplazar por Keycloak cuando se implemente el login de la app.
-export const MOCK_IDENTITY_USER_ID = 'seed-profesional-terreno-01';
+export const MOCK_IDENTITY_USER_ID = process.env.EXPO_PUBLIC_MOCK_IDENTITY_USER_ID ?? 'seed-profesional-terreno-01';
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  if (AUTH_MODE === 'keycloak') {
+    const token = getCurrentAccessToken();
+    if (!token) {
+      throw new Error(
+        'EXPO_PUBLIC_AUTH_MODE=keycloak pero no hay una sesión activa (no se ha hecho login todavía).'
+      );
+    }
+    return {
+      Authorization: `Bearer ${token}`,
+      ...extra,
+    };
+  }
+
   return {
     'x-identity-user-id': MOCK_IDENTITY_USER_ID,
     ...extra,
@@ -74,13 +93,20 @@ function opcionesComoArray(opciones?: Record<string, unknown> | null): string[] 
   return valores.length > 0 ? valores : undefined;
 }
 
+// Evita que dos llamadas a sincronizarRegistrosPendientes corran en paralelo (puede
+// pasar porque App.tsx la dispara tanto al encolar un registro nuevo como en un
+// intervalo periódico): sin este guard, dos pasadas superpuestas pueden leer la misma
+// cola antes de que la primera borre sus items, y la segunda manda un duplicado que
+// el backend rechaza con 409 y queda pegado reintentando para siempre.
+let sincronizacionEnCurso = false;
+
 export const syncService = {
 
   /**
    * 1. Descarga el itinerario de hoy y las plantillas de fichas desde backend-p1-salud
    * y las guarda en la base de datos local (IndexedDB).
    */
-  descargarDatosDelDia: async (): Promise<{ visitas: number; plantillas: number; profesional: { nombres: string; apellidos: string } | null }> => {
+  descargarDatosDelDia: async (): Promise<{ visitas: number; plantillas: number; catalogoMedicamentos: number; profesional: { nombres: string; apellidos: string } | null }> => {
     try {
       const fecha = hoyISO();
 
@@ -122,10 +148,22 @@ export const syncService = {
               obligatorio: !!c.obligatorio,
               placeholder: c.ayudaTexto ?? undefined,
               opciones: opcionesComoArray(c.opciones),
+              variableCodigo: c.tipoCampo === 'VARIABLE_CLINICA'
+                ? variablesPorId.get(c.variableClinicaId)?.codigo
+                : undefined,
             }));
           return { id: p.id, codigo: p.codigo, nombre: p.nombre, campos };
         }),
       );
+
+      // Catálogo de medicamentos, para el selector de la pestaña Historial.
+      const responseCatalogo = await fetch(`${API_BASE_URL}/medicamentos/catalogo`, { headers: authHeaders() });
+      const catalogoBase: any[] = responseCatalogo.ok ? await responseCatalogo.json() : [];
+      const apiCatalogoMedicamentos: LocalMedicamentoCatalogo[] = catalogoBase.map((c) => ({
+        id: c.id,
+        nombre: c.nombre,
+        presentacion: c.presentacion ?? null,
+      }));
 
       // Guardar en base de datos local (Sobrescribe / Actualiza registros)
       await db.visitas.clear();
@@ -134,9 +172,15 @@ export const syncService = {
       await db.plantillas.clear();
       await db.plantillas.bulkPut(apiPlantillas);
 
+      if (apiCatalogoMedicamentos.length > 0) {
+        await db.catalogoMedicamentos.clear();
+        await db.catalogoMedicamentos.bulkPut(apiCatalogoMedicamentos);
+      }
+
       return {
         visitas: apiVisitas.length,
         plantillas: apiPlantillas.length,
+        catalogoMedicamentos: apiCatalogoMedicamentos.length,
         profesional,
       };
     } catch (error) {
@@ -191,6 +235,31 @@ export const syncService = {
   },
 
   /**
+   * Reclama el kit portátil de sensores IoT (Proyecto 8) para este paciente,
+   * y devuelve la última lectura de cada sensor mapeada a códigos de variable
+   * clínica (misma convención que IOT_VARIABLE_MAP en el backend), lista para
+   * auto-completar los campos de la ficha. Best-effort: si el paciente no
+   * tiene conexión o el servicio IoT falla, devuelve {} en vez de lanzar,
+   * para no bloquear el flujo de check-in.
+   */
+  obtenerSignosVitalesIoT: async (pacienteId: string): Promise<Record<string, number>> => {
+    try {
+      await fetch(`${API_BASE_URL}/iot/paciente-sensores/${pacienteId}/reclamar-kit`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const response = await fetch(`${API_BASE_URL}/iot/paciente-sensores/${pacienteId}/signos-vitales`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) return {};
+      return await response.json();
+    } catch (error) {
+      console.warn('No se pudieron obtener signos vitales IoT:', error);
+      return {};
+    }
+  },
+
+  /**
    * 2. Guarda el borrador o registro clínico en la base de datos local
    * Si está offline, se encola en la cola de sincronización.
    */
@@ -224,6 +293,12 @@ export const syncService = {
    * Se ejecuta automáticamente al recuperar conexión a internet.
    */
   sincronizarRegistrosPendientes: async (): Promise<{ procesados: number; fallidos: number }> => {
+    if (sincronizacionEnCurso) {
+      return { procesados: 0, fallidos: 0 };
+    }
+    sincronizacionEnCurso = true;
+
+    try {
     const queue = await db.syncQueue.toArray();
     let procesados = 0;
     let fallidos = 0;
@@ -245,7 +320,19 @@ export const syncService = {
               origen: 'OFFLINE_SYNC',
             }),
           });
-          if (!checkpointRes.ok) { fallidos++; continue; }
+          if (!checkpointRes.ok) {
+            if (checkpointRes.status === 409) {
+              // Duplicado: el servidor ya tiene este checkpoint (típicamente por una
+              // sincronización concurrente previa). Se trata como ya procesado en vez
+              // de reintentarlo para siempre.
+              console.warn(`[SYNC] checkpoint ${item.tipo} ya existía en el servidor (409), se descarta el duplicado local.`);
+              await db.syncQueue.delete(item.id!);
+              procesados++;
+              continue;
+            }
+            console.error(`[SYNC DEBUG] checkpoint ${item.tipo} falló`, checkpointRes.status, await checkpointRes.text());
+            fallidos++; continue;
+          }
 
           const estadoRes = item.tipo === 'CHECK_IN'
             ? await fetch(`${API_BASE_URL}/visitas/${item.visita_id}/estado`, {
@@ -258,7 +345,22 @@ export const syncService = {
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({}),
               });
-          if (!estadoRes.ok) { fallidos++; continue; }
+          if (!estadoRes.ok) {
+            console.error(`[SYNC DEBUG] PATCH estado/completar falló`, estadoRes.status, await estadoRes.text());
+            fallidos++; continue;
+          }
+        } else if (item.tipo === 'EN_CAMINO') {
+          // Dispara la notificación al paciente de "profesional en camino" (ver
+          // VisitasService.cambiarEstado en el backend). No requiere checkpoint.
+          const enCaminoRes = await fetch(`${API_BASE_URL}/visitas/${item.visita_id}/estado`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ estado: 'EN_CAMINO' }),
+          });
+          if (!enCaminoRes.ok) {
+            console.error(`[SYNC DEBUG] PATCH estado EN_CAMINO falló`, enCaminoRes.status, await enCaminoRes.text());
+            fallidos++; continue;
+          }
         } else if (item.tipo === 'FICHA_CLINICA') {
           const fichaRes = await fetch(`${API_BASE_URL}/fichas-clinicas`, {
             method: 'POST',
@@ -274,30 +376,56 @@ export const syncService = {
               },
             }),
           });
-          if (!fichaRes.ok) { fallidos++; continue; }
-          const fichaCreada = await fichaRes.json();
+          let fichaCreada: any;
+          if (!fichaRes.ok) {
+            if (fichaRes.status === 409) {
+              // Duplicado: la visita ya tiene una ficha (típicamente por una
+              // sincronización concurrente previa). Recuperamos su id para poder
+              // seguir subiendo la foto adjunta en vez de perderla.
+              console.warn(`[SYNC] La ficha ya existía para la visita ${item.visita_id} (409), recuperando su id.`);
+              const existentesRes = await fetch(`${API_BASE_URL}/fichas-clinicas?visitaId=${item.visita_id}`, { headers: authHeaders() });
+              const existentes = existentesRes.ok ? await existentesRes.json() : [];
+              if (!existentes[0]) {
+                console.error(`[SYNC DEBUG] No se pudo recuperar la ficha existente tras 409 para visita ${item.visita_id}`);
+                fallidos++; continue;
+              }
+              fichaCreada = existentes[0];
+            } else {
+              console.error(`[SYNC DEBUG] POST /fichas-clinicas falló`, fichaRes.status, await fichaRes.text());
+              fallidos++; continue;
+            }
+          } else {
+            fichaCreada = await fichaRes.json();
+          }
 
           // La foto se sube recién ahora, referenciando la ficha ya creada (a
           // diferencia de appBack, que primero subía la foto y luego la embebía como
           // URL en la ficha).
           if (item.data?.fotoLocalUri) {
             const mimeType: string = item.data?.fotoMimeType || 'image/jpeg';
-            const extension = mimeType.split('/')[1] || 'jpg';
-            const formDataObj = new FormData();
-            formDataObj.append('fichaClinicaId', fichaCreada.id);
-            formDataObj.append('categoria', 'FOTO_CLINICA');
-            formDataObj.append('file', {
-              uri: item.data.fotoLocalUri,
-              name: `photo-${Date.now()}.${extension}`,
-              type: mimeType,
-            } as any);
-
-            const adjuntoRes = await fetch(`${API_BASE_URL}/documentos-adjuntos`, {
-              method: 'POST',
-              headers: authHeaders(),
-              body: formDataObj,
-            });
-            if (!adjuntoRes.ok) { fallidos++; continue; }
+            // Expo SDK 56 reemplazó el fetch global por su propio runtime ("winter"),
+            // que no soporta el patrón clásico de RN `formData.append('file', {uri,...})`
+            // para archivos locales (lanza "Unsupported FormDataPart implementation").
+            // expo-file-system/legacy hace el multipart de forma nativa, evitando el problema.
+            const uploadResult = await FileSystem.uploadAsync(
+              `${API_BASE_URL}/documentos-adjuntos`,
+              item.data.fotoLocalUri,
+              {
+                httpMethod: 'POST',
+                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                fieldName: 'file',
+                mimeType,
+                parameters: {
+                  fichaClinicaId: fichaCreada.id,
+                  categoria: 'FOTO_CLINICA',
+                },
+                headers: authHeaders(),
+              }
+            );
+            if (uploadResult.status < 200 || uploadResult.status >= 300) {
+              console.error(`[SYNC DEBUG] POST /documentos-adjuntos falló`, uploadResult.status, uploadResult.body);
+              fallidos++; continue;
+            }
           }
         } else if (item.tipo === 'SOLICITUD_CONTINUIDAD') {
           const alertaRes = await fetch(`${API_BASE_URL}/alertas`, {
@@ -311,7 +439,39 @@ export const syncService = {
               prioridad: 'ALTA',
             }),
           });
-          if (!alertaRes.ok) { fallidos++; continue; }
+          if (!alertaRes.ok) {
+            console.error(`[SYNC DEBUG] POST /alertas falló`, alertaRes.status, await alertaRes.text());
+            fallidos++; continue;
+          }
+        } else if (item.tipo === 'DIAGNOSTICO') {
+          // Una visita admite múltiples diagnósticos (a diferencia de la ficha
+          // clínica, que backend-p1-salud limita a una por visita).
+          const diagnosticoRes = await fetch(`${API_BASE_URL}/diagnosticos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({
+              visitaId: item.visita_id,
+              descripcion: item.data?.descripcion,
+            }),
+          });
+          if (!diagnosticoRes.ok) {
+            console.error(`[SYNC DEBUG] POST /diagnosticos falló`, diagnosticoRes.status, await diagnosticoRes.text());
+            fallidos++; continue;
+          }
+        } else if (item.tipo === 'MEDICAMENTO') {
+          const medicamentoRes = await fetch(`${API_BASE_URL}/medicamentos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({
+              visitaId: item.visita_id,
+              medicamentoCatalogoId: item.data?.medicamentoCatalogoId,
+              cantidadCajas: item.data?.cantidadCajas,
+            }),
+          });
+          if (!medicamentoRes.ok) {
+            console.error(`[SYNC DEBUG] POST /medicamentos falló`, medicamentoRes.status, await medicamentoRes.text());
+            fallidos++; continue;
+          }
         }
 
         // Si el servidor confirma la recepción, lo eliminamos de la cola local
@@ -326,6 +486,9 @@ export const syncService = {
     }
 
     return { procesados, fallidos };
+    } finally {
+      sincronizacionEnCurso = false;
+    }
   }
 };
 export default syncService;

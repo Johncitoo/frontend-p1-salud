@@ -54,6 +54,24 @@ export default function ItineraryScreen({ visitas, onSelectVisita, isOnline, onS
     }
   };
 
+  const getPriorityBg = (prioridad: string) => {
+    switch (prioridad) {
+      case "URGENTE": return "#FBEAEC";
+      case "ALTA": return "#FDF2E9";
+      case "NORMAL": return "#EBF3F6";
+      default: return "#F0F0F0";
+    }
+  };
+
+  const getPriorityLabel = (prioridad: string) => {
+    switch (prioridad) {
+      case "URGENTE": return "Urgente";
+      case "ALTA": return "Alta";
+      case "NORMAL": return "Normal";
+      default: return prioridad;
+    }
+  };
+
   const getStatusStyle = (estado: string) => {
     switch (estado) {
       case "REALIZADA":
@@ -175,10 +193,18 @@ export default function ItineraryScreen({ visitas, onSelectVisita, isOnline, onS
                   {/* Cuerpo de la Tarjeta */}
                   <VStack flex={1} gap="xs" style={styles.cardBody}>
                     <HStack justify="space-between" align="center" width="100%">
-                      <Label variant="caption" style={{ fontWeight: 'bold' }} color={theme.colors.grayText}>
-                        {item.hora}
-                      </Label>
-                      
+                      <HStack gap="xs" align="center">
+                        <Label variant="caption" style={{ fontWeight: 'bold' }} color={theme.colors.grayText}>
+                          {item.hora}
+                        </Label>
+
+                        <Box padding={4} radius="sm" bg={getPriorityBg(item.prioridad)}>
+                          <Label variant="caption" color={priorityColor} style={{ fontSize: 11, fontWeight: 'bold' }}>
+                            {getPriorityLabel(item.prioridad)}
+                          </Label>
+                        </Box>
+                      </HStack>
+
                       <Box padding={4} radius="sm" bg={status.bg}>
                         <Label variant="caption" color={status.text} style={{ fontSize: 12, fontWeight: 'bold' }}>
                           {status.label}

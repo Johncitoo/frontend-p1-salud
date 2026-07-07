@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
 import { theme } from '../theme';
 import { Card, CardHeader, CardContent, CardFooter } from '../components/Card';
 import { Label } from '../components/Label';
 import { FormInput } from '../components/Input';
 import { PrimaryButton } from '../components/Button';
 import { VStack, HStack } from '../components/Layout';
+import { AUTH_MODE } from '../services/syncService';
+import { loginWithKeycloak } from '../services/keycloakAuth';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -17,7 +19,22 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = () => {
+  // El client "p1" de Keycloak solo admite el flujo de navegador (Authorization
+  // Code + PKCE): el email/contraseña tipeados acá no se usan en modo keycloak,
+  // el login real ocurre en la pantalla del navegador que abre Keycloak.
+  const handleSubmitKeycloak = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithKeycloak();
+      onLoginSuccess();
+    } catch (err: any) {
+      Alert.alert('No se pudo iniciar sesión', err?.message ?? 'Error desconocido al conectar con Keycloak.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmitMock = () => {
     if (!email || !password) return;
     setIsLoading(true);
     setTimeout(() => {
@@ -26,6 +43,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       onLoginSuccess();
     }, 1500);
   };
+
+  const handleSubmit = AUTH_MODE === 'keycloak' ? handleSubmitKeycloak : handleSubmitMock;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>

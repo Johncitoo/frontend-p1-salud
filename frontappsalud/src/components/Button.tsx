@@ -12,6 +12,7 @@ interface ButtonProps extends TouchableOpacityProps {
   variant?: 'primary' | 'secondary' | 'outline';
   fullWidth?: boolean;
   isLoading?: boolean;
+  textColor?: string;
 }
 
 export function PrimaryButton({
@@ -20,8 +21,10 @@ export function PrimaryButton({
   isLoading,
   disabled,
   style,
+  textColor,
   ...props
 }: ButtonProps) {
+  const resolvedTextColor = textColor ?? theme.colors.white;
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -42,11 +45,11 @@ export function PrimaryButton({
       {...props}
     >
       {isLoading ? (
-        <ActivityIndicator color={theme.colors.white} />
+        <ActivityIndicator color={resolvedTextColor} />
       ) : (
         <Text
           style={{
-            color: theme.colors.white,
+            color: resolvedTextColor,
             fontSize: theme.fontSize.subtitle,
             fontWeight: '600',
           }}
@@ -64,8 +67,10 @@ export function SecondaryButton({
   isLoading,
   disabled,
   style,
+  textColor,
   ...props
 }: ButtonProps) {
+  const resolvedTextColor = textColor ?? theme.colors.stormyTeal;
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -88,11 +93,11 @@ export function SecondaryButton({
       {...props}
     >
       {isLoading ? (
-        <ActivityIndicator color={theme.colors.stormyTeal} />
+        <ActivityIndicator color={resolvedTextColor} />
       ) : (
         <Text
           style={{
-            color: theme.colors.stormyTeal,
+            color: resolvedTextColor,
             fontSize: theme.fontSize.subtitle,
             fontWeight: '600',
           }}
@@ -110,8 +115,10 @@ export function OutlineButton({
   isLoading,
   disabled,
   style,
+  textColor,
   ...props
 }: ButtonProps) {
+  const resolvedTextColor = textColor ?? theme.colors.stormyTeal;
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -134,11 +141,11 @@ export function OutlineButton({
       {...props}
     >
       {isLoading ? (
-        <ActivityIndicator color={theme.colors.stormyTeal} />
+        <ActivityIndicator color={resolvedTextColor} />
       ) : (
         <Text
           style={{
-            color: theme.colors.stormyTeal,
+            color: resolvedTextColor,
             fontSize: theme.fontSize.body,
           }}
         >
