@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
 import { theme } from '../theme';
 import { Card, CardHeader, CardContent, CardFooter } from '../components/Card';
 import { Label } from '../components/Label';
@@ -7,7 +7,7 @@ import { FormInput } from '../components/Input';
 import { PrimaryButton } from '../components/Button';
 import { VStack, HStack } from '../components/Layout';
 import { AUTH_MODE } from '../services/syncService';
-import { loginWithKeycloak } from '../services/keycloakAuth';
+import { loginWithKeycloak, hasKeycloakAccessRole, logoutFromKeycloak } from '../services/keycloakAuth';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -20,12 +20,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   // El client "p1" de Keycloak solo admite el flujo de navegador (Authorization
-  // Code + PKCE): el email/contraseña tipeados acá no se usan en modo keycloak,
-  // el login real ocurre en la pantalla del navegador que abre Keycloak.
+  // Code + PKCE): el email/contraseña tipeados acá no se usan en modo keycloak.
+  // El login abre el navegador del sistema (Custom Tabs en Android) en vez de
+  // un WebView propio: el Keycloak del Grupo 12 corre detrás de un túnel ngrok
+  // gratuito cuyo aviso de advertencia rompe los recursos JS/CSS de la página
+  // dentro de un WebView (ver comentario en keycloakAuth.ts).
   const handleSubmitKeycloak = async () => {
     setIsLoading(true);
     try {
       await loginWithKeycloak();
+
+      // Gate de acceso: realm_access.roles debe incluir p1-access (rol
+      // centralizado del Grupo 12 que habilita el ingreso a Proyecto 1).
+      // El rol de aplicación específico (resource_access.p1.roles) lo
+      // resuelve el backend en cada request, no hace falta acá.
+      if (!hasKeycloakAccessRole()) {
+        logoutFromKeycloak();
+        Alert.alert(
+          'Acceso denegado',
+          'Tu cuenta existe en el Sistema de Identidad, pero no tiene el rol de acceso requerido para Proyecto 1.',
+        );
+        return;
+      }
+
       onLoginSuccess();
     } catch (err: any) {
       Alert.alert('No se pudo iniciar sesión', err?.message ?? 'Error desconocido al conectar con Keycloak.');
@@ -45,6 +62,24 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   };
 
   const handleSubmit = AUTH_MODE === 'keycloak' ? handleSubmitKeycloak : handleSubmitMock;
+
+  // En modo keycloak no hay formulario propio que llenar (los campos de
+  // email/contraseña de esta pantalla son cosméticos y no se usan contra el
+  // Sistema de Identidad del Grupo 12): pantalla mínima con un solo botón que
+  // abre el navegador del sistema hacia el login centralizado.
+  if (AUTH_MODE === 'keycloak') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <VStack align="center" gap="md">
+          {isLoading ? (
+            <ActivityIndicator size="large" color={theme.colors.stormyTeal} />
+          ) : (
+            <PrimaryButton onPress={handleSubmitKeycloak}>Iniciar Sesión</PrimaryButton>
+          )}
+        </VStack>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>

@@ -59,7 +59,12 @@ function mapVisitaCalendario(row: any): LocalVisita {
       numero: '',
       comuna: '',
     },
-    prestacion: row.prestacion ?? '',
+    // GET /visitas/calendario nunca manda un campo `prestacion` singular (solo
+    // el array `prestaciones`, ver backend-p1-salud/src/visitas/visitas.service.ts)
+    // — antes esto quedaba siempre vacío ("") en mensajes como el de continuidad.
+    prestacion: Array.isArray(row.prestaciones)
+      ? row.prestaciones.map((p: any) => p?.nombre).filter(Boolean).join(', ')
+      : '',
     fichaClinicaId: row.fichaClinicaId ?? undefined,
   };
 }

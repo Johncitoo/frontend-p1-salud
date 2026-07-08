@@ -3,6 +3,7 @@ import { CalendarDays, CircleCheck, Pencil, Search, XCircle, Calendar as Calenda
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import CalendarView, { CalendarVisitRow } from './CalendarView'
+import SeguimientoAgendaPanel from './SeguimientoAgendaPanel'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -667,7 +668,11 @@ const AgendaPage = () => {
         )}
 
         {canWrite ? (
-          <form onSubmit={handleSubmitVisit} className='rounded-xl border border-[#9CBFC1]/35 bg-[#203C50]/92 p-6 shadow-xl shadow-black/10'>
+          <div className='grid gap-6 lg:grid-cols-[320px_1fr] lg:items-start'>
+            <SeguimientoAgendaPanel
+              onSelectPaciente={pacienteId => setForm(current => ({ ...current, pacienteId }))}
+            />
+            <form onSubmit={handleSubmitVisit} className='rounded-xl border border-[#9CBFC1]/35 bg-[#203C50]/92 p-6 shadow-xl shadow-black/10'>
             <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
               <div className='flex items-center gap-2'>
                 <CalendarDays className='size-5 text-[#9CBFC1]' />
@@ -774,7 +779,8 @@ const AgendaPage = () => {
                 ) : null}
               </div>
             </fieldset>
-          </form>
+            </form>
+          </div>
         ) : null}
 
       </section>

@@ -5,7 +5,7 @@ import { Box, VStack, HStack } from '../components/Layout';
 import { Label } from '../components/Label';
 import { FormInput } from '../components/Input';
 import { PrimaryButton, SecondaryButton, OutlineButton } from '../components/Button';
-import { ArrowLeft, MapPin, ClipboardList, CheckSquare, Camera, Check, PenTool } from 'lucide-react-native';
+import { ArrowLeft, MapPin, ClipboardList, CheckSquare, Camera, Check } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { syncService } from '../services/syncService';
 
@@ -97,7 +97,7 @@ interface VisitDetailScreenProps {
   onBack: () => void;
   onUpdateVisitaState: (visitaId: string, nuevoEstado: string, datosConsulta?: any) => void;
   onRegisterAttention: (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'DIAGNOSTICO' | 'MEDICAMENTO', visitaId: string, data: any) => Promise<void>;
-  onScheduleFollowUp: (visitaBase: any) => void;
+  onScheduleFollowUp: (visitaBase: any, diasSeguimiento: string) => void;
 }
 
 export default function VisitDetailScreen({ visita, plantillas, catalogoMedicamentos, onBack, onUpdateVisitaState, onRegisterAttention, onScheduleFollowUp }: VisitDetailScreenProps) {
@@ -105,14 +105,10 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
   const [estadoVisita, setEstadoVisita] = useState(visita.estado);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
 
-  // Control de Modales de Alergias, Medicación y Firma
+  // Control de Modales de Alergias y Medicación
   const [showAllergiesModal, setShowAllergiesModal] = useState(false);
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
-
-  // Estados del Formulario de Firma
-  const [signerName, setSignerName] = useState("");
-  const [signerRut, setSignerRut] = useState("");
-  const [hasDrawnSignature, setHasDrawnSignature] = useState(false);
+  const [showSeguimientoModal, setShowSeguimientoModal] = useState(false);
+  const [diasSeguimiento, setDiasSeguimiento] = useState("15");
 
   // Plantillas dinámicas provenientes del backend
   const templatesList = plantillas && plantillas.length > 0 ? plantillas : MOCK_PLANTILLAS;
@@ -491,10 +487,11 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
     setActiveTab("CONSULTA"); // Llevar directo a la consulta tras el check-in
   };
 
-  // Pre-Finalizar: ejecuta validaciones y abre modal de firma. El cierre de la
-  // atención ahora se gatilla desde "Historial" (diagnóstico) y no depende de
+  // Finaliza la atención: valida el diagnóstico y guarda todo de una vez (sin
+  // paso de firma de conformidad, se sacó por pedido explícito). El cierre de
+  // la atención se gatilla desde "Historial" (diagnóstico) y no depende de
   // haber llenado una ficha en "Consulta" (esa sigue siendo opcional).
-  const handlePreFinalizar = () => {
+  const handleFinalizar = async () => {
     if (!diagnostico.trim()) {
       Alert.alert(
         "Falta el Diagnóstico",
@@ -504,22 +501,6 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
       return;
     }
 
-    // Si todo es válido, abre el modal de firma de conformidad
-    setShowSignatureModal(true);
-  };
-
-  // Guardado definitivo con la firma del cuidador/paciente
-  const handleFinalizarConFirma = async () => {
-    if (!signerName || !signerRut || !hasDrawnSignature) {
-      Alert.alert(
-        "Faltan Datos de Conformidad",
-        "Por favor ingresa el Nombre, RUT y dibuja la firma digital del cuidador o paciente para certificar la atención.",
-        [{ text: "Entendido" }]
-      );
-      return;
-    }
-
-    setShowSignatureModal(false);
     setIsLoading(true);
 
     try {
@@ -539,11 +520,6 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
           prestacionesRealizadas: [visita.prestacion],
           fotoLocalUri: ficha.fotoUrl,
           fotoMimeType: ficha.fotoMimeType,
-          conformidad: {
-            nombre: signerName,
-            rut: signerRut,
-            firma_token: "HASH_MOCK_SIGNATURE_" + Date.now(),
-          }
         });
       }
 
@@ -575,10 +551,7 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
           { text: "No, gracias", onPress: onBack },
           {
             text: "Solicitar Seguimiento",
-            onPress: () => {
-              onScheduleFollowUp(visita);
-              Alert.alert("Listo", "Solicitud de continuidad encolada; se enviará al coordinador al sincronizar.", [{ text: "Ok", onPress: onBack }]);
-            }
+            onPress: () => setShowSeguimientoModal(true),
           }
         ]
       );
@@ -872,7 +845,7 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
             {estadoVisita === "EN_ATENCION" && (
               <PrimaryButton
                 isLoading={isLoading}
-                onPress={handlePreFinalizar}
+                onPress={handleFinalizar}
                 style={{ height: 46 }}
               >
                 🏁 Finalizar Consulta y Registrar Check-Out
@@ -1320,75 +1293,45 @@ export default function VisitDetailScreen({ visita, plantillas, catalogoMedicame
         </View>
       </Modal>
 
-      {/* ✍️ MODAL 3: FIRMA DIGITAL DE CONFORMIDAD (NUEVO REQUERIMIENTO) */}
+      {/* MODAL: PLAZO DE SEGUIMIENTO */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={showSignatureModal}
-        onRequestClose={() => setShowSignatureModal(false)}
+        visible={showSeguimientoModal}
+        onRequestClose={() => setShowSeguimientoModal(false)}
       >
         <View style={styles.modalOverlay}>
           <Box bg={theme.colors.white} radius="lg" padding="lg" style={[styles.modalContent, { maxWidth: 360 }]}>
             <VStack gap="md">
-              <Label variant="h2" color={theme.colors.yaleBlue}>✍️ Firma de Conformidad</Label>
+              <Label variant="h2" color={theme.colors.yaleBlue}>Plazo de Seguimiento</Label>
               <Label variant="caption">
-                Registra la identidad y la firma de conformidad del paciente o cuidador a cargo para finalizar el servicio.
+                ¿En cuántos días debería realizarse la visita de continuidad para este paciente?
               </Label>
 
-              <VStack gap="sm" style={{ marginTop: 4 }}>
-                <FormInput
-                  label="Nombre del Receptor / Cuidador"
-                  value={signerName}
-                  onChangeText={setSignerName}
-                  placeholder="Ej: María Gómez"
-                />
-
-                <FormInput
-                  label="RUT del Firmante"
-                  value={signerRut}
-                  onChangeText={setSignerRut}
-                  placeholder="Ej: 12.345.678-k"
-                />
-
-                {/* Lienzo de Firma Táctil Simulado */}
-                <VStack gap="xs">
-                  <Label variant="caption" style={{ fontWeight: '600' }}>Firma en Pantalla (Táctil)</Label>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={[styles.signaturePad, hasDrawnSignature && styles.signaturePadActive]}
-                    onPress={() => setHasDrawnSignature(!hasDrawnSignature)}
-                  >
-                    {hasDrawnSignature ? (
-                      <HStack align="center" gap="xs">
-                        <Check size={20} color={theme.colors.success} />
-                        <Label variant="body" color={theme.colors.success} style={{ fontWeight: '600' }}>
-                          Firma Táctil Capturada
-                        </Label>
-                      </HStack>
-                    ) : (
-                      <VStack align="center" gap="xs">
-                        <PenTool size={24} color={theme.colors.grayText} />
-                        <Label variant="caption" color={theme.colors.grayText}>
-                          Toca aquí para simular firma con el dedo
-                        </Label>
-                      </VStack>
-                    )}
-                  </TouchableOpacity>
-                </VStack>
-              </VStack>
+              <FormInput
+                label="Días para el seguimiento"
+                value={diasSeguimiento}
+                onChangeText={setDiasSeguimiento}
+                placeholder="Ej: 15"
+                keyboardType="numeric"
+              />
 
               <HStack gap="sm" style={{ marginTop: 12 }}>
                 <OutlineButton
                   style={{ flex: 1 }}
-                  onPress={() => setShowSignatureModal(false)}
+                  onPress={() => setShowSeguimientoModal(false)}
                 >
-                  Volver
+                  Cancelar
                 </OutlineButton>
 
                 <PrimaryButton
                   style={{ flex: 1.5 }}
-                  onPress={handleFinalizarConFirma}
-                  disabled={!signerName || !signerRut || !hasDrawnSignature}
+                  disabled={!diasSeguimiento.trim()}
+                  onPress={() => {
+                    setShowSeguimientoModal(false);
+                    onScheduleFollowUp(visita, diasSeguimiento.trim());
+                    Alert.alert("Listo", "Solicitud de continuidad encolada; se enviará al coordinador al sincronizar.", [{ text: "Ok", onPress: onBack }]);
+                  }}
                 >
                   Confirmar
                 </PrimaryButton>
@@ -1588,22 +1531,6 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: '#F7F7F7',
-  },
-  signaturePad: {
-    width: '100%',
-    height: 120,
-    borderWidth: 1,
-    borderColor: theme.colors.alabasterGrey,
-    borderRadius: theme.radius.md,
-    borderStyle: 'dashed',
-    backgroundColor: '#F9F9F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signaturePadActive: {
-    borderColor: theme.colors.success,
-    backgroundColor: '#EAF6F3',
-    borderStyle: 'solid',
   },
   completedFichaRow: {
     paddingVertical: 10,
