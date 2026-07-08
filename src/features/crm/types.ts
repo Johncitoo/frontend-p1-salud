@@ -15,6 +15,16 @@ export interface CrmTicket {
   updatedAt: string
 }
 
+export interface CreateCrmTicketInput {
+  tipo: string
+  titulo: string
+  descripcion?: string
+  severidad: 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
+  pacienteId?: string
+  visitaId?: string
+  profesionalSaludId?: string
+}
+
 export interface CrmExternalStatus {
   id: string
   externalIncidentId?: string | null

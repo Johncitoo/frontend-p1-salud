@@ -20,6 +20,8 @@ import {
 } from './fichaFormUtils'
 import { clearDraft, readDraft, saveDraft } from './draftStorage'
 import FichaAdjuntosPanel from './FichaAdjuntosPanel'
+import DiagnosticoMedicamentosPanel from './DiagnosticoMedicamentosPanel'
+import SignosVitalesIotPanel from './SignosVitalesIotPanel'
 
 // ============================================================
 const fieldClassName =
@@ -120,6 +122,18 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setPlantillaFichaId(activePlantillas[0].id)
         }
 
+        const loadPacienteContextForVisita = async (visId: string) => {
+          try {
+            const visita = await apiGet<VisitaOptionRow>(`/visitas/${visId}`)
+            if (cancelled) return
+            setPacienteId(visita.pacienteId)
+            setVisitas([visita])
+          } catch {
+            // No bloquea el guardado; los selectores (deshabilitados en este modo)
+            // solo quedarian mostrando el placeholder en vez del paciente/visita real.
+          }
+        }
+
         const applyFicha = async (ficha: FichaClinicaRow) => {
           if (cancelled) return
 
@@ -127,6 +141,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setCurrentVersion(ficha.version)
           setFichaEstado(ficha.estado)
           setCreatedFichaId(current => current ?? ficha.id)
+          await loadPacienteContextForVisita(ficha.visitaId)
 
           if (ficha.plantillaFichaId) {
             setPlantillaFichaId(ficha.plantillaFichaId)
@@ -153,6 +168,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
         } else if (propVisitaId) {
           // Modo creación desde visita. Si la visita ya tiene ficha, se continúa esa ficha.
           setVisitaId(propVisitaId)
+          await loadPacienteContextForVisita(propVisitaId)
           const existing = await apiGet<FichaClinicaRow[]>(`/fichas-clinicas?visitaId=${propVisitaId}`)
           if (cancelled) return
           if (existing[0]) await applyFicha(existing[0])
@@ -551,6 +567,16 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
               {campos.length > 0 && (
                 <div className='mb-6 border-t border-slate-200 pt-5'>
                   <h2 className='mb-4 text-lg font-semibold text-slate-800'>Campos clínicos</h2>
+
+                  {pacienteId && !isClosed && (
+                    <SignosVitalesIotPanel
+                      pacienteId={pacienteId}
+                      campos={campos}
+                      fields={fields}
+                      onFill={updateField}
+                      isClosed={isClosed}
+                    />
+                  )}
                   <div className='grid gap-5 md:grid-cols-2'>
                     {campos.map(campo => {
                       const inputType = getInputType(campo.tipoCampo)
@@ -723,6 +749,8 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
             </>
           )}
         </form>
+
+        <DiagnosticoMedicamentosPanel visitaId={visitaId} isClosed={isClosed} />
 
         <FichaAdjuntosPanel fichaClinicaId={effectiveFichaId} isClosed={isClosed} />
       </section>

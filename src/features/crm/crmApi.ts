@@ -1,5 +1,5 @@
-import { apiGet } from '@/lib/api'
-import type { CrmTicket, CrmExternalStatus } from './types'
+import { apiGet, apiPost } from '@/lib/api'
+import type { CrmTicket, CrmExternalStatus, CreateCrmTicketInput } from './types'
 
 export const getCrmTickets = async (params?: {
   estado?: string
@@ -15,4 +15,10 @@ export const getCrmTickets = async (params?: {
 
 export const getCrmTicketExternalStatus = async (id: string) => {
   return await apiGet<CrmExternalStatus>(`/incidentes-salud/${id}/crm`)
+}
+
+// Alta MANUAL de un ticket de soporte por un profesional. El backend marca origen
+// WEB y (solo para altas manuales) genera el ticket en el CRM del Proyecto 07.
+export const createCrmTicket = async (input: CreateCrmTicketInput) => {
+  return await apiPost<CrmTicket, CreateCrmTicketInput>('/incidentes-salud', input)
 }
