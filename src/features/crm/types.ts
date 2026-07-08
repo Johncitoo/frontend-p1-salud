@@ -21,6 +21,8 @@ export interface CreateCrmTicketInput {
   descripcion?: string
   severidad: 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
   pacienteId?: string
+  visitaId?: string
+  profesionalSaludId?: string
 }
 
 export interface CrmExternalStatus {

@@ -13,6 +13,29 @@ type PacienteOption = {
   rut: string
 }
 
+type ProfesionalOption = {
+  id: string
+  profesion: string
+  numeroRegistro: string | null
+  activo: boolean
+}
+
+type VisitaOption = {
+  id: string
+  fechaProgramada?: string | null
+  horaProgramada?: string | null
+  estado?: string | null
+}
+
+const formatVisitaLabel = (v: VisitaOption) => {
+  const fecha = v.fechaProgramada
+    ? new Date(`${v.fechaProgramada}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'medium' })
+    : 'Sin fecha'
+  const hora = v.horaProgramada ? ` ${v.horaProgramada.slice(0, 5)}` : ''
+  const estado = v.estado ? ` · ${v.estado}` : ''
+  return `${fecha}${hora}${estado}`
+}
+
 // Tipos pensados para SOPORTE al cliente (lo que un agente de CRM puede atender).
 // A diferencia de los incidentes automáticos del sistema (visitas atrasadas, IoT),
 // estos los levanta manualmente un profesional.
@@ -31,6 +54,8 @@ const emptyForm: CreateCrmTicketInput = {
   descripcion: '',
   severidad: 'MEDIA',
   pacienteId: undefined,
+  visitaId: undefined,
+  profesionalSaludId: undefined,
 }
 
 export default function CrmTicketsListPage() {
@@ -51,6 +76,19 @@ export default function CrmTicketsListPage() {
     queryKey: ['pacientesOptions'],
     queryFn: () => apiGet<PacienteOption[]>('/pacientes'),
     enabled: isCreateOpen,
+  })
+
+  const { data: profesionales = [] } = useQuery({
+    queryKey: ['profesionalesOptions'],
+    queryFn: () => apiGet<ProfesionalOption[]>('/profesionales'),
+    enabled: isCreateOpen,
+  })
+
+  // Las visitas dependen del paciente elegido; se piden solo cuando hay uno.
+  const { data: visitas = [] } = useQuery({
+    queryKey: ['visitasPaciente', form.pacienteId],
+    queryFn: () => apiGet<VisitaOption[]>(`/pacientes/${form.pacienteId}/visitas`),
+    enabled: isCreateOpen && !!form.pacienteId,
   })
 
   const createMutation = useMutation({
@@ -77,6 +115,8 @@ export default function CrmTicketsListPage() {
       titulo: form.titulo.trim(),
       descripcion: form.descripcion?.trim() || undefined,
       pacienteId: form.pacienteId || undefined,
+      visitaId: form.visitaId || undefined,
+      profesionalSaludId: form.profesionalSaludId || undefined,
     })
   }
 
@@ -369,7 +409,7 @@ export default function CrmTicketsListPage() {
                 <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Paciente / cliente</label>
                 <select
                   value={form.pacienteId ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, pacienteId: e.target.value || undefined }))}
+                  onChange={(e) => setForm((f) => ({ ...f, pacienteId: e.target.value || undefined, visitaId: undefined }))}
                   className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
                 >
                   <option value=''>Sin paciente asociado</option>
@@ -381,6 +421,47 @@ export default function CrmTicketsListPage() {
                 </select>
                 <p className='mt-1 text-xs text-[#6B8A8C]'>
                   El CRM usa los datos del paciente (nombre, email) para vincular el ticket a un cliente.
+                </p>
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Visita asociada</label>
+                <select
+                  value={form.visitaId ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, visitaId: e.target.value || undefined }))}
+                  disabled={!form.pacienteId}
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  <option value=''>Sin visita asociada</option>
+                  {visitas.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {formatVisitaLabel(v)}
+                    </option>
+                  ))}
+                </select>
+                <p className='mt-1 text-xs text-[#6B8A8C]'>
+                  {form.pacienteId
+                    ? 'Opcional. Se envía el id de la visita para que CRM la consulte.'
+                    : 'Elige primero un paciente para ver sus visitas.'}
+                </p>
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Profesional</label>
+                <select
+                  value={form.profesionalSaludId ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, profesionalSaludId: e.target.value || undefined }))}
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
+                >
+                  <option value=''>Sin profesional asociado</option>
+                  {profesionales.filter((p) => p.activo).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.profesion}{p.numeroRegistro ? ` — ${p.numeroRegistro}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className='mt-1 text-xs text-[#6B8A8C]'>
+                  Opcional. Se envía el id del profesional para que CRM lo consulte.
                 </p>
               </div>
 
