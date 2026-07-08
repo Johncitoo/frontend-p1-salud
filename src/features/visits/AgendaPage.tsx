@@ -3,7 +3,11 @@ import { CalendarDays, CircleCheck, Pencil, Search, XCircle, Calendar as Calenda
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import CalendarView, { CalendarVisitRow } from './CalendarView'
+import SeguimientoAgendaPanel from './SeguimientoAgendaPanel'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 
 type VisitRow = {
   id: string
@@ -224,6 +228,8 @@ const AgendaPage = () => {
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null)
+  const [motivoModal, setMotivoModal] = useState<{ visit: VisitRow; accion: 'cancelar' | 'reprogramar' } | null>(null)
+  const [motivoTexto, setMotivoTexto] = useState('')
 
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('CALENDAR')
   const [calendarVisits, setCalendarVisits] = useState<CalendarVisitRow[]>([])
@@ -437,6 +443,12 @@ const AgendaPage = () => {
         return
       }
 
+      if (estado === 'REPROGRAMADA') {
+        setMotivoTexto('')
+        setMotivoModal({ visit, accion: 'reprogramar' })
+        return
+      }
+
       await apiPatch<VisitRow, { estado: string }>(`/visitas/${visit.id}/estado`, { estado })
       setSuccessMsg(`Visita marcada como ${estado}.`)
       loadData()
@@ -445,18 +457,33 @@ const AgendaPage = () => {
     }
   }
 
-  const handleCancel = async (visit: VisitRow) => {
-    if (!window.confirm('¿Cancelar esta visita?')) return
+  const handleCancel = (visit: VisitRow) => {
+    setMotivoTexto('')
+    setMotivoModal({ visit, accion: 'cancelar' })
+  }
+
+  const handleConfirmMotivo = async () => {
+    if (!motivoModal) return
+    const { visit, accion } = motivoModal
     setError('')
     setSuccessMsg('')
     try {
-      await apiPatch<VisitRow, { observacionCancelacion: string }>(`/visitas/${visit.id}/cancelar`, {
-        observacionCancelacion: 'Cancelada desde agenda',
-      })
-      setSuccessMsg('Visita cancelada.')
+      if (accion === 'cancelar') {
+        await apiPatch<VisitRow, { observacionCancelacion: string }>(`/visitas/${visit.id}/cancelar`, {
+          observacionCancelacion: motivoTexto.trim() || 'Cancelada desde agenda',
+        })
+        setSuccessMsg('Visita cancelada.')
+      } else {
+        await apiPatch<VisitRow, { estado: string; observacion?: string }>(`/visitas/${visit.id}/estado`, {
+          estado: 'REPROGRAMADA',
+          ...(motivoTexto.trim() ? { observacion: motivoTexto.trim() } : {}),
+        })
+        setSuccessMsg('Visita marcada como REPROGRAMADA.')
+      }
+      setMotivoModal(null)
       loadData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No fue posible cancelar la visita.')
+      setError(err instanceof Error ? err.message : 'No fue posible actualizar la visita.')
     }
   }
 
@@ -641,7 +668,11 @@ const AgendaPage = () => {
         )}
 
         {canWrite ? (
-          <form onSubmit={handleSubmitVisit} className='rounded-xl border border-[#9CBFC1]/35 bg-[#203C50]/92 p-6 shadow-xl shadow-black/10'>
+          <div className='grid gap-6 lg:grid-cols-[320px_1fr] lg:items-start'>
+            <SeguimientoAgendaPanel
+              onSelectPaciente={pacienteId => setForm(current => ({ ...current, pacienteId }))}
+            />
+            <form onSubmit={handleSubmitVisit} className='rounded-xl border border-[#9CBFC1]/35 bg-[#203C50]/92 p-6 shadow-xl shadow-black/10'>
             <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
               <div className='flex items-center gap-2'>
                 <CalendarDays className='size-5 text-[#9CBFC1]' />
@@ -748,10 +779,42 @@ const AgendaPage = () => {
                 ) : null}
               </div>
             </fieldset>
-          </form>
+            </form>
+          </div>
         ) : null}
 
       </section>
+
+      <Dialog open={motivoModal !== null} onOpenChange={(open) => { if (!open) setMotivoModal(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {motivoModal?.accion === 'cancelar' ? 'Cancelar visita' : 'Reprogramar visita'}
+            </DialogTitle>
+            <DialogDescription>
+              {motivoModal?.accion === 'cancelar'
+                ? '¿Seguro que quieres cancelar esta visita? El motivo se incluye en el correo al paciente.'
+                : 'Indica el motivo de la reprogramación (se incluye en el correo al paciente).'}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            autoFocus
+            rows={3}
+            placeholder='Motivo (opcional)'
+            value={motivoTexto}
+            onChange={(e) => setMotivoTexto(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setMotivoModal(null)}>Volver</Button>
+            <Button
+              variant={motivoModal?.accion === 'cancelar' ? 'destructive' : 'default'}
+              onClick={handleConfirmMotivo}
+            >
+              {motivoModal?.accion === 'cancelar' ? 'Cancelar visita' : 'Confirmar reprogramación'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

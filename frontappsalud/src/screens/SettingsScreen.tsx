@@ -5,6 +5,7 @@ import { Box, VStack, HStack } from '../components/Layout';
 import { Label } from '../components/Label';
 import { PrimaryButton, OutlineButton } from '../components/Button';
 import { db } from '../database/offlineDb';
+import { clearSnapshot } from '../database/offlineDbPersistence';
 import { syncService } from '../services/syncService';
 import { Wifi, WifiOff, Database, RefreshCw, Trash2, ClipboardList } from 'lucide-react-native';
 
@@ -75,6 +76,10 @@ export default function SettingsScreen({ isOnline, onToggleOnline }: SettingsScr
             await db.visitas.clear();
             await db.plantillas.clear();
             await db.syncQueue.clear();
+            // Table.clear() no dispara los hooks de persistencia (ver
+            // offlineDbPersistence.ts) — sin esto, el snapshot viejo en disco
+            // "resucitaría" los datos borrados en el próximo arranque.
+            await clearSnapshot();
             await loadLocalStats();
             Alert.alert("Base de datos limpia", "Todos los registros locales han sido eliminados.");
           } 

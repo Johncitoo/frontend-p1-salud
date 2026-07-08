@@ -9,19 +9,50 @@ import ItineraryScreen from './src/screens/ItineraryScreen';
 import VisitDetailScreen from './src/screens/VisitDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { db } from './src/database/offlineDb';
+import { hydrateFromSnapshot } from './src/database/offlineDbPersistence';
 import { Calendar, Settings } from 'lucide-react-native';
 
-import { syncService } from './src/services/syncService';
+import { syncService, AUTH_MODE } from './src/services/syncService';
+import { restoreSession, hasKeycloakAccessRole } from './src/services/keycloakAuth';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'LOGIN' | 'ITINERARY' | 'VISIT_DETAIL' | 'SETTINGS'>('LOGIN');
   const [visitas, setVisitas] = useState<any[]>([]);
   const [plantillas, setPlantillas] = useState<any[]>([]);
+  const [catalogoMedicamentos, setCatalogoMedicamentos] = useState<any[]>([]);
   const [selectedVisitaId, setSelectedVisitaId] = useState<string | null>(null);
   const [profesionalNombre, setProfesionalNombre] = useState<string | undefined>(undefined);
 
   // Estado de red global
   const [isOnline, setIsOnline] = useState(true);
+
+  // fake-indexeddb (usado porque RN no tiene IndexedDB real) es solo en memoria:
+  // si no esperamos a restaurar el snapshot en disco antes de la primera lectura,
+  // un reinicio de la app parece haber "perdido" todos los datos offline.
+  const [dbReady, setDbReady] = useState(false);
+
+  // Evita que se muestre el login por una fracción de segundo mientras se
+  // consulta si ya había una sesión de Keycloak guardada (ver keycloakAuth.ts).
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Sesión persistida (SecureStore): si existe y tiene el rol de acceso, entra
+  // directo al itinerario sin pasar por Keycloak de nuevo. Se resuelve una sola
+  // vez al arrancar, con el estado de red que haya en ese momento (isOnline
+  // arranca en `true`; si en realidad no hay señal, restoreSession igual
+  // confía en el token guardado sin intentar refrescarlo, ver keycloakAuth.ts).
+  useEffect(() => {
+    if (AUTH_MODE !== 'keycloak') {
+      setAuthChecked(true);
+      return;
+    }
+    restoreSession(isOnline)
+      .then((restored) => {
+        if (restored && hasKeycloakAccessRole()) {
+          setCurrentScreen('ITINERARY');
+        }
+      })
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   const handleDescargarDatos = async () => {
     try {
@@ -34,36 +65,77 @@ export default function App() {
       }
       const localVisitas = await db.visitas.toArray();
       const localPlantillas = await db.plantillas.toArray();
+      const localCatalogoMedicamentos = await db.catalogoMedicamentos.toArray();
 
       setVisitas(localVisitas);
       setPlantillas(localPlantillas);
+      setCatalogoMedicamentos(localCatalogoMedicamentos);
     } catch (err) {
       console.error("Fallo al descargar datos del backend:", err);
       // Sin conexión y sin nada previamente sincronizado: no hay datos reales que
       // mostrar, así que la lista queda vacía (la UI ya maneja el estado "sin visitas").
       const localVisitas = await db.visitas.toArray();
       const localPlantillas = await db.plantillas.toArray();
+      const localCatalogoMedicamentos = await db.catalogoMedicamentos.toArray();
       setVisitas(localVisitas);
       setPlantillas(localPlantillas);
+      setCatalogoMedicamentos(localCatalogoMedicamentos);
     }
   };
 
-  const handleRegistrarAtencion = async (tipo: 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA', visitaId: string, data: any) => {
+  const handleRegistrarAtencion = async (tipo: 'EN_CAMINO' | 'CHECK_IN' | 'CHECK_OUT' | 'FICHA_CLINICA' | 'DIAGNOSTICO' | 'MEDICAMENTO', visitaId: string, data: any) => {
     try {
       await syncService.guardarAtencionLocal(tipo, visitaId, data);
       console.log(`Atención guardada localmente en Dexie: ${tipo} para visita ${visitaId}`);
+      intentarSincronizarPendientes();
     } catch (err) {
       console.error("Error guardando atención en IndexedDB:", err);
     }
   };
 
+  // Sube la cola pendiente sin intervención manual. Se llama apenas se encola
+  // un registro nuevo y, como respaldo, en un intervalo periódico mientras haya
+  // señal (por si un intento anterior falló o quedaron registros de una sesión previa).
+  const intentarSincronizarPendientes = async () => {
+    if (!isOnline) return;
+    try {
+      const pendientes = await db.syncQueue.count();
+      if (pendientes === 0) return;
+      const resultado = await syncService.sincronizarRegistrosPendientes();
+      console.log(`Auto-sincronización: ${resultado.procesados} procesados, ${resultado.fallidos} fallidos`);
+    } catch (err) {
+      console.error("Error en auto-sincronización:", err);
+    }
+  };
+
+  // Restaurar la cola/datos offline guardados en disco antes de que cualquier
+  // pantalla lea `db` (ver src/database/offlineDbPersistence.ts).
+  useEffect(() => {
+    hydrateFromSnapshot()
+      .catch(err => console.error('Error restaurando datos offline:', err))
+      .finally(() => setDbReady(true));
+  }, []);
+
   // Inicializar base de datos local y descargar datos dinámicos
   useEffect(() => {
+    if (!dbReady) return;
     handleDescargarDatos();
-  }, [isOnline]);
+  }, [isOnline, dbReady]);
+
+  useEffect(() => {
+    if (!dbReady) return;
+    if (!isOnline) return;
+    intentarSincronizarPendientes();
+    const interval = setInterval(intentarSincronizarPendientes, 20000);
+    return () => clearInterval(interval);
+  }, [isOnline, dbReady]);
 
   const handleLoginSuccess = () => {
     setCurrentScreen('ITINERARY');
+    // El intento automático de descarga en el arranque (línea arriba) ocurre antes
+    // del login, así que en modo Keycloak siempre falla por falta de token. Ahora
+    // que ya hay sesión, hay que reintentar para traer los datos reales.
+    handleDescargarDatos();
   };
 
   const handleSelectVisita = (id: string) => {
@@ -93,19 +165,25 @@ export default function App() {
   // Solicitar continuidad de atención para un paciente frágil: el profesional no
   // agenda la visita de seguimiento directamente, encola una solicitud de alerta que
   // el coordinador revisa (POST /alertas, tipo CONTINUIDAD) al sincronizar.
-  const handleSolicitarContinuidad = async (visitaBase: any) => {
+  const handleSolicitarContinuidad = async (visitaBase: any, diasSeguimiento: string) => {
     try {
       await syncService.guardarAtencionLocal('SOLICITUD_CONTINUIDAD', visitaBase.id, {
         pacienteId: visitaBase.pacienteId,
-        mensaje: `Paciente frágil: se solicita visita de seguimiento tras "${visitaBase.prestacion}".`,
+        mensaje: `Paciente frágil: se solicita visita de seguimiento en ${diasSeguimiento} días.`,
       });
-      console.log(`Solicitud de continuidad encolada para visita ${visitaBase.id}`);
+      console.log(`Solicitud de continuidad encolada para visita ${visitaBase.id} (${diasSeguimiento} días)`);
     } catch (err) {
       console.error("Error al encolar la solicitud de continuidad:", err);
     }
   };
 
   const selectedVisita = visitas.find(v => v.id === selectedVisitaId);
+
+  // Evita el parpadeo de la pantalla de login mientras se resuelve si ya
+  // había una sesión de Keycloak guardada (ver useEffect de restoreSession).
+  if (!authChecked) {
+    return <SafeAreaView style={styles.container} />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -129,6 +207,7 @@ export default function App() {
             <VisitDetailScreen
               visita={selectedVisita}
               plantillas={plantillas}
+              catalogoMedicamentos={catalogoMedicamentos}
               onBack={() => setCurrentScreen('ITINERARY')}
               onUpdateVisitaState={handleUpdateVisitaState}
               onRegisterAttention={handleRegistrarAtencion}
