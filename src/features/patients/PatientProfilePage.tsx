@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft, Activity, Stethoscope, AlertTriangle, Plus, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, Activity, Stethoscope, AlertTriangle, Plus, X, Search, RefreshCw, BatteryLow, Wifi, WifiOff, ChevronLeft, ChevronRight, Hash, Clock } from 'lucide-react'
 import { apiGet, apiPost } from '@/lib/api'
 
 type PatientRow = {
@@ -40,6 +40,34 @@ type DeviceRow = {
   createdAt: string
 }
 
+// Dispositivo del catálogo del Grupo 8 (GET /iot/devices)
+type CatalogDeviceRow = {
+  sensorId: string
+  assetId: string
+  sensorType: string
+  batteryLevel?: number
+  connectionStatus?: string
+  lastReadingAt?: string
+}
+
+type DeviceCatalogResponse = {
+  data: CatalogDeviceRow[]
+  page: number
+  limit: number
+  total: number
+}
+
+const SENSOR_TYPE_LABELS: Record<string, string> = {
+  glucometer: 'Glucómetro',
+  pulse_oximeter: 'Oxímetro de Pulso',
+  thermometer: 'Termómetro',
+  sphygmomanometer: 'Esfigmomanómetro',
+}
+
+const CATALOG_LIMIT = 25
+
+type CatalogSortMode = 'sensorId' | 'lastReading'
+
 export default function PatientProfilePage({ patientId }: { patientId: string }) {
   const [patient, setPatient] = useState<PatientRow | null>(null)
   const [mediciones, setMediciones] = useState<MedicionRow[]>([])
@@ -50,10 +78,18 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [assetId, setAssetId] = useState('')
-  const [sensorId, setSensorId] = useState('')
   const [sensorType, setSensorType] = useState('glucometer')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Catálogo de dispositivos (Grupo 8)
+  const [catalog, setCatalog] = useState<CatalogDeviceRow[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  const [search, setSearch] = useState('')
+  const [selectedDevice, setSelectedDevice] = useState<CatalogDeviceRow | null>(null)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [sortMode, setSortMode] = useState<CatalogSortMode>('sensorId')
 
   const loadData = () => {
     Promise.all([
@@ -86,19 +122,106 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
     }
   }
 
+  // Cargar el catálogo COMPLETO de ese tipo de sensor al abrir el modal o al
+  // cambiar tipo/búsqueda. Traemos todas las páginas (la API pagina por última
+  // lectura, no por ID) para poder ordenar y paginar del lado nuestro y que el
+  // orden "Por ID" salga continuo (001, 002, 003...) en vez de con huecos.
+  // Se debouncea la búsqueda para no llamar en cada tecla.
+  useEffect(() => {
+    if (!isModalOpen) return
+
+    let cancelled = false
+    setCatalogLoading(true)
+    setCatalogError('')
+    setPage(1)
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const FETCH_LIMIT = 100 // máximo permitido por la API del Grupo 8
+        const MAX_PAGES = 10 // tope de seguridad (hasta 1000 dispositivos)
+        let all: CatalogDeviceRow[] = []
+        let apiWasNull = false
+        let p = 1
+
+        while (p <= MAX_PAGES) {
+          const params = new URLSearchParams({ limit: String(FETCH_LIMIT), page: String(p), sensorType })
+          if (search.trim()) params.set('search', search.trim())
+
+          const res = await apiGet<DeviceCatalogResponse | null>(`/iot/devices?${params.toString()}`)
+          if (cancelled) return
+          if (!res) { apiWasNull = true; break }
+
+          all = all.concat(res.data ?? [])
+          if (!res.data?.length || all.length >= (res.total ?? all.length)) break
+          p++
+        }
+
+        if (cancelled) return
+        setCatalog(all)
+        setTotal(all.length)
+        if (apiWasNull && all.length === 0) {
+          setCatalogError('No se pudo obtener el catálogo del Grupo 8 (IoT deshabilitado o su API caída).')
+        }
+      } catch (err) {
+        if (cancelled) return
+        setCatalog([])
+        setTotal(0)
+        setCatalogError(err instanceof Error ? err.message : 'Error al cargar el catálogo de dispositivos.')
+      } finally {
+        if (!cancelled) setCatalogLoading(false)
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [isModalOpen, sensorType, search])
+
+  // Orden completo del catálogo según sortMode (sobre TODOS los dispositivos,
+  // no solo una página): por sensorId (numérico, OXI-002 antes que OXI-010) o
+  // por última lectura (más reciente primero).
+  const sortedCatalog = useMemo(() => {
+    const rows = [...catalog]
+    if (sortMode === 'lastReading') {
+      return rows.sort((a, b) => (b.lastReadingAt ?? '').localeCompare(a.lastReadingAt ?? ''))
+    }
+    return rows.sort((a, b) => a.sensorId.localeCompare(b.sensorId, undefined, { numeric: true }))
+  }, [catalog, sortMode])
+
+  const totalPages = Math.max(1, Math.ceil(total / CATALOG_LIMIT))
+
+  // Paginación del lado nuestro sobre la lista ya ordenada completa.
+  const pagedCatalog = useMemo(
+    () => sortedCatalog.slice((page - 1) * CATALOG_LIMIT, page * CATALOG_LIMIT),
+    [sortedCatalog, page],
+  )
+
+  const openModal = () => {
+    setSelectedDevice(null)
+    setSearch('')
+    setSensorType('glucometer')
+    setSortMode('sensorId')
+    setPage(1)
+    setCatalog([])
+    setTotal(0)
+    setCatalogError('')
+    setIsModalOpen(true)
+  }
+
   const handleAssignDevice = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!selectedDevice) return
     setIsSubmitting(true)
     try {
       await apiPost('/iot/paciente-sensores', {
         pacienteId: patientId,
-        assetId,
-        sensorId,
-        sensorType,
+        assetId: selectedDevice.assetId,
+        sensorId: selectedDevice.sensorId,
+        sensorType: selectedDevice.sensorType,
       })
       setIsModalOpen(false)
-      setAssetId('')
-      setSensorId('')
+      setSelectedDevice(null)
       // Reload devices
       const devs = await apiGet<DeviceRow[]>(`/iot/paciente-sensores/${patientId}`)
       setDevices(devs)
@@ -147,7 +270,7 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
                   {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
                 </button>
                 <button
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={openModal}
                   className='flex items-center gap-1 bg-[#3C6E71] text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#2F5658] transition-colors'
                 >
                   <Plus className='h-4 w-4' />
@@ -245,69 +368,164 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
       {/* Modal Asignar Dispositivo */}
       {isModalOpen && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
-          <div className='w-full max-w-md bg-white rounded-2xl p-6 shadow-xl'>
-            <div className='flex items-center justify-between mb-6'>
+          <div className='flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-xl'>
+            <div className='mb-4 flex items-center justify-between'>
               <h2 className='text-xl font-bold text-slate-900'>Vincular Dispositivo IoT</h2>
               <button onClick={() => setIsModalOpen(false)} className='text-slate-400 hover:text-slate-600'>
                 <X className='size-5' />
               </button>
             </div>
-            
-            <form onSubmit={handleAssignDevice} className='space-y-4'>
-              <div>
-                <label className='block text-sm font-medium text-slate-700 mb-1'>Tipo de Sensor</label>
-                <select 
-                  value={sensorType}
-                  onChange={(e) => setSensorType(e.target.value)}
-                  className='w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white'
-                  required
-                >
-                  <option value='glucometer'>Glucómetro</option>
-                  <option value='pulse_oximeter'>Oxímetro de Pulso</option>
-                  <option value='thermometer'>Termómetro</option>
-                  <option value='sphygmomanometer'>Esfigmomanómetro</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className='block text-sm font-medium text-slate-700 mb-1'>ID del Kit / Asset (assetId)</label>
-                <input 
-                  type='text'
-                  value={assetId}
-                  onChange={(e) => setAssetId(e.target.value)}
-                  className='w-full border border-slate-300 rounded-lg p-2.5 text-sm'
-                  placeholder='Ej. PATIENT-001'
-                  required
-                />
-                <p className='text-xs text-slate-500 mt-1'>Identificador único provisto por el Equipo 08.</p>
+
+            <form onSubmit={handleAssignDevice} className='flex min-h-0 flex-1 flex-col'>
+              {/* Filtros */}
+              <div className='mb-3 grid gap-3 sm:grid-cols-2'>
+                <div>
+                  <label className='mb-1 block text-sm font-medium text-slate-700'>Tipo de Sensor</label>
+                  <select
+                    value={sensorType}
+                    onChange={(e) => { setSensorType(e.target.value); setSelectedDevice(null); setPage(1) }}
+                    className='w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm'
+                  >
+                    {Object.entries(SENSOR_TYPE_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className='mb-1 block text-sm font-medium text-slate-700'>Buscar</label>
+                  <div className='relative'>
+                    <Search className='pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
+                    <input
+                      type='text'
+                      value={search}
+                      onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                      className='w-full rounded-lg border border-slate-300 py-2.5 pl-8 pr-3 text-sm'
+                      placeholder='Ej. OXI-001'
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className='block text-sm font-medium text-slate-700 mb-1'>ID del Sensor (sensorId)</label>
-                <input 
-                  type='text'
-                  value={sensorId}
-                  onChange={(e) => setSensorId(e.target.value)}
-                  className='w-full border border-slate-300 rounded-lg p-2.5 text-sm'
-                  placeholder='Ej. GLUCO-192'
-                  required
-                />
+              {/* Orden + contador */}
+              <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
+                <p className='text-xs text-slate-500'>
+                  Catálogo del Equipo 08. Solo aparecen sensores con lecturas registradas.
+                </p>
+                <div className='inline-flex overflow-hidden rounded-lg border border-slate-300 text-xs'>
+                  <button
+                    type='button'
+                    onClick={() => setSortMode('sensorId')}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 font-medium transition ${
+                      sortMode === 'sensorId' ? 'bg-[#3C6E71] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Hash className='size-3.5' /> Por ID
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => setSortMode('lastReading')}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 font-medium transition ${
+                      sortMode === 'lastReading' ? 'bg-[#3C6E71] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Clock className='size-3.5' /> Última lectura
+                  </button>
+                </div>
               </div>
 
-              <div className='pt-4 flex justify-end gap-3'>
-                <button 
-                  type='button' 
+              {/* Lista de dispositivos */}
+              <div className='min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200'>
+                {catalogLoading ? (
+                  <div className='flex items-center justify-center gap-2 py-10 text-sm text-slate-500'>
+                    <RefreshCw className='size-4 animate-spin' /> Cargando dispositivos...
+                  </div>
+                ) : catalogError ? (
+                  <div className='px-4 py-8 text-center text-sm text-amber-700'>{catalogError}</div>
+                ) : catalog.length === 0 ? (
+                  <div className='px-4 py-8 text-center text-sm text-slate-500'>
+                    No hay dispositivos de este tipo{search.trim() ? ' para esa búsqueda' : ''}.
+                  </div>
+                ) : (
+                  <ul className='divide-y divide-slate-100'>
+                    {pagedCatalog.map(device => {
+                      const isSelected = selectedDevice?.sensorId === device.sensorId
+                      const offline = device.connectionStatus && device.connectionStatus !== 'connected'
+                      return (
+                        <li key={device.sensorId}>
+                          <button
+                            type='button'
+                            onClick={() => setSelectedDevice(device)}
+                            className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${
+                              isSelected ? 'bg-[#3C6E71]/10' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className='min-w-0'>
+                              <p className='text-sm font-semibold text-slate-900'>{device.sensorId}</p>
+                              <p className='text-xs text-slate-500'>
+                                Asset: {device.assetId} · {SENSOR_TYPE_LABELS[device.sensorType] ?? device.sensorType}
+                              </p>
+                            </div>
+                            <div className='flex shrink-0 items-center gap-2 text-xs text-slate-500'>
+                              {typeof device.batteryLevel === 'number' && (
+                                <span className={`inline-flex items-center gap-1 ${device.batteryLevel <= 20 ? 'text-red-600' : ''}`}>
+                                  <BatteryLow className='size-3.5' /> {device.batteryLevel}%
+                                </span>
+                              )}
+                              {offline ? (
+                                <WifiOff className='size-3.5 text-red-500' />
+                              ) : (
+                                <Wifi className='size-3.5 text-emerald-500' />
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              {/* Paginación */}
+              {!catalogLoading && !catalogError && total > 0 && (
+                <div className='mt-2 flex items-center justify-between gap-2 text-xs text-slate-500'>
+                  <span>
+                    {total} dispositivo{total === 1 ? '' : 's'} · página {page} de {totalPages}
+                  </span>
+                  <div className='flex items-center gap-1'>
+                    <button
+                      type='button'
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className='inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
+                    >
+                      <ChevronLeft className='size-3.5' /> Anterior
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className='inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
+                    >
+                      Siguiente <ChevronRight className='size-3.5' />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className='flex justify-end gap-3 pt-4'>
+                <button
+                  type='button'
                   onClick={() => setIsModalOpen(false)}
-                  className='px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition'
+                  className='rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100'
                 >
                   Cancelar
                 </button>
-                <button 
-                  type='submit' 
-                  disabled={isSubmitting}
-                  className='px-4 py-2 text-sm font-medium text-white bg-[#3C6E71] hover:bg-[#2A4D4F] rounded-lg transition disabled:opacity-50'
+                <button
+                  type='submit'
+                  disabled={isSubmitting || !selectedDevice}
+                  className='rounded-lg bg-[#3C6E71] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2A4D4F] disabled:opacity-50'
                 >
-                  {isSubmitting ? 'Guardando...' : 'Asignar Dispositivo'}
+                  {isSubmitting ? 'Guardando...' : selectedDevice ? `Vincular ${selectedDevice.sensorId}` : 'Selecciona un dispositivo'}
                 </button>
               </div>
             </form>

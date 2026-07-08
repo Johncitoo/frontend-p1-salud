@@ -1,21 +1,91 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, ShieldAlert, X } from 'lucide-react'
-import { getCrmTickets, getCrmTicketExternalStatus } from './crmApi'
-import type { CrmTicket } from './types'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle, AlertTriangle, Plus, ShieldAlert, X } from 'lucide-react'
+import { getCrmTickets, getCrmTicketExternalStatus, createCrmTicket } from './crmApi'
+import type { CrmTicket, CreateCrmTicketInput } from './types'
+import { useCurrentUser } from '@/features/auth/AuthSessionContext'
+import { apiGet } from '@/lib/api'
+
+type PacienteOption = {
+  id: string
+  nombres: string
+  apellidos: string
+  rut: string
+}
+
+// Tipos pensados para SOPORTE al cliente (lo que un agente de CRM puede atender).
+// A diferencia de los incidentes automáticos del sistema (visitas atrasadas, IoT),
+// estos los levanta manualmente un profesional.
+const TIPOS_TICKET_SOPORTE = [
+  'CONSULTA_CLIENTE',
+  'RECLAMO',
+  'SOLICITUD_INFORMACION',
+  'SEGUIMIENTO_PACIENTE',
+  'COORDINACION_ATENCION',
+  'OTRO',
+] as const
+
+const emptyForm: CreateCrmTicketInput = {
+  tipo: 'CONSULTA_CLIENTE',
+  titulo: '',
+  descripcion: '',
+  severidad: 'MEDIA',
+  pacienteId: undefined,
+}
 
 export default function CrmTicketsListPage() {
   const [selectedTicket, setSelectedTicket] = useState<CrmTicket | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [form, setForm] = useState<CreateCrmTicketInput>(emptyForm)
+  const [formError, setFormError] = useState('')
+  const queryClient = useQueryClient()
+  const session = useCurrentUser()
+  const canCreate = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
 
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ['crmTickets'],
     queryFn: () => getCrmTickets(),
   })
 
+  const { data: pacientes = [] } = useQuery({
+    queryKey: ['pacientesOptions'],
+    queryFn: () => apiGet<PacienteOption[]>('/pacientes'),
+    enabled: isCreateOpen,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: createCrmTicket,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crmTickets'] })
+      setIsCreateOpen(false)
+      setForm(emptyForm)
+      setFormError('')
+    },
+    onError: (err) => {
+      setFormError(err instanceof Error ? err.message : 'No se pudo crear el ticket.')
+    },
+  })
+
+  const handleSubmit = () => {
+    if (!form.titulo.trim()) {
+      setFormError('El título es obligatorio.')
+      return
+    }
+    setFormError('')
+    createMutation.mutate({
+      ...form,
+      titulo: form.titulo.trim(),
+      descripcion: form.descripcion?.trim() || undefined,
+      pacienteId: form.pacienteId || undefined,
+    })
+  }
+
   const { data: externalStatus, isLoading: isLoadingExternal } = useQuery({
     queryKey: ['crmTicketExternal', selectedTicket?.id],
     queryFn: () => getCrmTicketExternalStatus(selectedTicket!.id),
-    enabled: !!selectedTicket && (selectedTicket.severidad === 'ALTA' || selectedTicket.severidad === 'CRÍTICA' || selectedTicket.severidad === 'CRITICA'),
+    // Solo hay estado en CRM que consultar si el incidente generó un ticket allá
+    // (tiene externalIncidentId). Aplica a los manuales, sin importar la severidad.
+    enabled: !!selectedTicket?.externalIncidentId,
     retry: false,
   })
 
@@ -56,6 +126,15 @@ export default function CrmTicketsListPage() {
             Supervisa las alertas del sistema y revisa su estado en el CRM de Incidentes.
           </p>
         </div>
+        {canCreate && (
+          <button
+            onClick={() => { setForm(emptyForm); setFormError(''); setIsCreateOpen(true) }}
+            className='inline-flex items-center gap-2 rounded-xl bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2A4D4F]'
+          >
+            <Plus className='size-4' />
+            Crear ticket de soporte
+          </button>
+        )}
       </div>
 
       <div className='overflow-hidden rounded-2xl border border-[#3C6E71]/40 bg-[#203C50] shadow-xl'>
@@ -112,7 +191,7 @@ export default function CrmTicketsListPage() {
                       </span>
                     </td>
                     <td className='px-6 py-4 text-right'>
-                      {(ticket.severidad === 'ALTA' || ticket.severidad === 'CRÍTICA' || ticket.severidad === 'CRITICA') ? (
+                      {ticket.externalIncidentId ? (
                         <button
                           onClick={() => setSelectedTicket(ticket)}
                           className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71]/20 px-3 py-1.5 text-xs font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71] hover:text-white'
@@ -218,6 +297,128 @@ export default function CrmTicketsListPage() {
                 className='rounded-xl bg-[#3C6E71] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2A4D4F]'
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de alta MANUAL de ticket de soporte */}
+      {isCreateOpen && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
+          <div className='w-full max-w-lg rounded-2xl border border-[#3C6E71]/50 bg-[#182F3F] p-6 shadow-2xl'>
+            <div className='flex items-center justify-between border-b border-[#3C6E71]/30 pb-4'>
+              <h2 className='flex items-center gap-2 text-lg font-bold text-white'>
+                <Plus className='size-5 text-[#9CBFC1]' />
+                Crear ticket de soporte
+              </h2>
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className='rounded-lg p-1 text-[#9CBFC1] transition hover:bg-[#3C6E71]/30 hover:text-white'
+              >
+                <X className='size-5' />
+              </button>
+            </div>
+
+            <p className='mt-4 text-xs text-[#9CBFC1]'>
+              Este ticket se enviará al CRM de soporte (Proyecto 07). Úsalo para
+              situaciones que requieren seguimiento con el cliente/paciente. Los avisos
+              automáticos del sistema (visitas atrasadas, sensores IoT) no pasan por aquí.
+            </p>
+
+            <div className='mt-4 space-y-4'>
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Título *</label>
+                <input
+                  value={form.titulo}
+                  onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+                  placeholder='Ej. Cliente solicita reagendar visita'
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+                />
+              </div>
+
+              <div className='grid grid-cols-2 gap-4'>
+                <div>
+                  <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Tipo</label>
+                  <select
+                    value={form.tipo}
+                    onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+                    className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
+                  >
+                    {TIPOS_TICKET_SOPORTE.map((t) => (
+                      <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Severidad</label>
+                  <select
+                    value={form.severidad}
+                    onChange={(e) => setForm((f) => ({ ...f, severidad: e.target.value as CreateCrmTicketInput['severidad'] }))}
+                    className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
+                  >
+                    <option value='BAJA'>BAJA</option>
+                    <option value='MEDIA'>MEDIA</option>
+                    <option value='ALTA'>ALTA</option>
+                    <option value='CRITICA'>CRITICA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Paciente / cliente</label>
+                <select
+                  value={form.pacienteId ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, pacienteId: e.target.value || undefined }))}
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
+                >
+                  <option value=''>Sin paciente asociado</option>
+                  {pacientes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombres} {p.apellidos} — {p.rut}
+                    </option>
+                  ))}
+                </select>
+                <p className='mt-1 text-xs text-[#6B8A8C]'>
+                  El CRM usa los datos del paciente (nombre, email) para vincular el ticket a un cliente.
+                </p>
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Descripción</label>
+                <textarea
+                  value={form.descripcion}
+                  onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                  rows={3}
+                  placeholder='Detalle de la situación...'
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+                />
+              </div>
+
+              {formError && (
+                <div className='flex items-start gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-400'>
+                  <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+                  {formError}
+                </div>
+              )}
+            </div>
+
+            <div className='mt-6 flex justify-end gap-3'>
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className='rounded-xl border border-[#3C6E71]/40 px-4 py-2 text-sm font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71]/20'
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={createMutation.isPending}
+                className='inline-flex items-center gap-2 rounded-xl bg-[#3C6E71] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2A4D4F] disabled:opacity-50'
+              >
+                {createMutation.isPending && (
+                  <div className='size-4 animate-spin rounded-full border-2 border-white/30 border-t-white'></div>
+                )}
+                Crear ticket
               </button>
             </div>
           </div>

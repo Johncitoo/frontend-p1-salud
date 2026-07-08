@@ -20,6 +20,8 @@ import {
 } from './fichaFormUtils'
 import { clearDraft, readDraft, saveDraft } from './draftStorage'
 import FichaAdjuntosPanel from './FichaAdjuntosPanel'
+import DiagnosticoMedicamentosPanel from './DiagnosticoMedicamentosPanel'
+import SignosVitalesIotPanel from './SignosVitalesIotPanel'
 
 // ============================================================
 const fieldClassName =
@@ -565,6 +567,16 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
               {campos.length > 0 && (
                 <div className='mb-6 border-t border-slate-200 pt-5'>
                   <h2 className='mb-4 text-lg font-semibold text-slate-800'>Campos clínicos</h2>
+
+                  {pacienteId && !isClosed && (
+                    <SignosVitalesIotPanel
+                      pacienteId={pacienteId}
+                      campos={campos}
+                      fields={fields}
+                      onFill={updateField}
+                      isClosed={isClosed}
+                    />
+                  )}
                   <div className='grid gap-5 md:grid-cols-2'>
                     {campos.map(campo => {
                       const inputType = getInputType(campo.tipoCampo)
@@ -737,6 +749,8 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
             </>
           )}
         </form>
+
+        <DiagnosticoMedicamentosPanel visitaId={visitaId} isClosed={isClosed} />
 
         <FichaAdjuntosPanel fichaClinicaId={effectiveFichaId} isClosed={isClosed} />
       </section>

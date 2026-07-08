@@ -36,7 +36,7 @@ const isImageDocument = (documento: DocumentoAdjunto) =>
 
 const FichaAdjuntosPanel = ({ fichaClinicaId, isClosed = false }: FichaAdjuntosPanelProps) => {
   const session = useCurrentUser()
-  const userRole = session.profile?.rol ?? ''
+  const userRole = session.rol ?? ''
   const canUpload = canUploadRoles.has(userRole) && !isClosed
   const canDelete = canDeleteRoles.has(userRole) && !isClosed
 
