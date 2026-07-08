@@ -230,6 +230,8 @@ const AgendaPage = () => {
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null)
   const [motivoModal, setMotivoModal] = useState<{ visit: VisitRow; accion: 'cancelar' | 'reprogramar' } | null>(null)
   const [motivoTexto, setMotivoTexto] = useState('')
+  const [reprogFecha, setReprogFecha] = useState('')
+  const [reprogHora, setReprogHora] = useState('')
 
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('CALENDAR')
   const [calendarVisits, setCalendarVisits] = useState<CalendarVisitRow[]>([])
@@ -443,12 +445,6 @@ const AgendaPage = () => {
         return
       }
 
-      if (estado === 'REPROGRAMADA') {
-        setMotivoTexto('')
-        setMotivoModal({ visit, accion: 'reprogramar' })
-        return
-      }
-
       await apiPatch<VisitRow, { estado: string }>(`/visitas/${visit.id}/estado`, { estado })
       setSuccessMsg(`Visita marcada como ${estado}.`)
       loadData()
@@ -460,6 +456,13 @@ const AgendaPage = () => {
   const handleCancel = (visit: VisitRow) => {
     setMotivoTexto('')
     setMotivoModal({ visit, accion: 'cancelar' })
+  }
+
+  const handleReprogramar = (visit: VisitRow) => {
+    setMotivoTexto('')
+    setReprogFecha(visit.fechaProgramada)
+    setReprogHora(visit.horaProgramada?.slice(0, 5) ?? '09:00')
+    setMotivoModal({ visit, accion: 'reprogramar' })
   }
 
   const handleConfirmMotivo = async () => {
@@ -474,11 +477,19 @@ const AgendaPage = () => {
         })
         setSuccessMsg('Visita cancelada.')
       } else {
-        await apiPatch<VisitRow, { estado: string; observacion?: string }>(`/visitas/${visit.id}/estado`, {
-          estado: 'REPROGRAMADA',
-          ...(motivoTexto.trim() ? { observacion: motivoTexto.trim() } : {}),
-        })
-        setSuccessMsg('Visita marcada como REPROGRAMADA.')
+        if (!reprogFecha || !reprogHora) {
+          setError('Indica la nueva fecha y hora de la visita.')
+          return
+        }
+        await apiPatch<VisitRow, { fechaProgramadaNueva: string; horaProgramadaNueva: string; observacion?: string }>(
+          `/visitas/${visit.id}/reprogramar`,
+          {
+            fechaProgramadaNueva: reprogFecha,
+            horaProgramadaNueva: reprogHora,
+            ...(motivoTexto.trim() ? { observacion: motivoTexto.trim() } : {}),
+          },
+        )
+        setSuccessMsg('Visita reprogramada.')
       }
       setMotivoModal(null)
       loadData()
@@ -649,6 +660,11 @@ const AgendaPage = () => {
                             </button>
                           ) : null}
                           {canWrite && !['CANCELADA', 'REALIZADA'].includes(visit.estado) ? (
+                            <button onClick={() => handleReprogramar(visit)} className='inline-flex items-center gap-1 rounded-md border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50'>
+                              <RefreshCcw className='size-3' /> Reprogramar
+                            </button>
+                          ) : null}
+                          {canWrite && !['CANCELADA', 'REALIZADA'].includes(visit.estado) ? (
                             <button onClick={() => handleCancel(visit)} className='inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50'>
                               <XCircle className='size-3' /> Cancelar
                             </button>
@@ -794,11 +810,33 @@ const AgendaPage = () => {
             <DialogDescription>
               {motivoModal?.accion === 'cancelar'
                 ? '¿Seguro que quieres cancelar esta visita? El motivo se incluye en el correo al paciente.'
-                : 'Indica el motivo de la reprogramación (se incluye en el correo al paciente).'}
+                : 'Indica la nueva fecha y hora de la visita. El paciente y el profesional recibirán un correo con el cambio.'}
             </DialogDescription>
           </DialogHeader>
+          {motivoModal?.accion === 'reprogramar' ? (
+            <div className='grid grid-cols-2 gap-3'>
+              <div>
+                <label className='text-xs font-semibold text-slate-600'>Nueva fecha</label>
+                <input
+                  type='date'
+                  value={reprogFecha}
+                  onChange={(e) => setReprogFecha(e.target.value)}
+                  className='mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm'
+                />
+              </div>
+              <div>
+                <label className='text-xs font-semibold text-slate-600'>Nueva hora</label>
+                <input
+                  type='time'
+                  value={reprogHora}
+                  onChange={(e) => setReprogHora(e.target.value)}
+                  className='mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm'
+                />
+              </div>
+            </div>
+          ) : null}
           <Textarea
-            autoFocus
+            autoFocus={motivoModal?.accion === 'cancelar'}
             rows={3}
             placeholder='Motivo (opcional)'
             value={motivoTexto}
