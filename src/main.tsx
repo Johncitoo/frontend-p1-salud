@@ -8,7 +8,6 @@ import { AuthSessionProvider } from './features/auth/AuthSessionContext'
 const queryClient = new QueryClient()
 
 const root = document.getElementById('root')
-const queryClient = new QueryClient()
 
 if (root) {
   createRoot(root).render(
