@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { Card, CardHeader, CardContent, CardFooter } from '../components/Card';
 import { Label } from '../components/Label';

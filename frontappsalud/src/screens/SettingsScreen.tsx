@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, Switch, TouchableOpacity, View, ActivityIndicator, Alert, Platform } from 'react-native';
+import { StyleSheet, ScrollView, Switch, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
 import { theme } from '../theme';
 import { Box, VStack, HStack } from '../components/Layout';
 import { Label } from '../components/Label';
@@ -7,14 +7,15 @@ import { PrimaryButton, OutlineButton } from '../components/Button';
 import { db } from '../database/offlineDb';
 import { clearSnapshot } from '../database/offlineDbPersistence';
 import { syncService } from '../services/syncService';
-import { Wifi, WifiOff, Database, RefreshCw, Trash2, ClipboardList } from 'lucide-react-native';
+import { Wifi, WifiOff, Database, RefreshCw, Trash2, ClipboardList, LogOut } from 'lucide-react-native';
 
 interface SettingsScreenProps {
   isOnline: boolean;
   onToggleOnline: (val: boolean) => void;
+  onLogout: () => void;
 }
 
-export default function SettingsScreen({ isOnline, onToggleOnline }: SettingsScreenProps) {
+export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: SettingsScreenProps) {
   const [queueItems, setQueueItems] = useState<any[]>([]);
   const [stats, setStats] = useState({ visits: 0, templates: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
@@ -84,6 +85,17 @@ export default function SettingsScreen({ isOnline, onToggleOnline }: SettingsScr
             Alert.alert("Base de datos limpia", "Todos los registros locales han sido eliminados.");
           } 
         }
+      ]
+    );
+  };
+
+  const handleLogoutPress = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Seguro que quieres cerrar sesión? Vas a tener que volver a iniciar sesión para seguir usando la app.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Cerrar Sesión", style: "destructive", onPress: onLogout },
       ]
     );
   };
@@ -205,7 +217,7 @@ export default function SettingsScreen({ isOnline, onToggleOnline }: SettingsScr
 
               <View style={styles.divider} />
 
-              <OutlineButton 
+              <OutlineButton
                 style={styles.dangerOutline}
                 onPress={handleClearDatabase}
               >
@@ -218,7 +230,22 @@ export default function SettingsScreen({ isOnline, onToggleOnline }: SettingsScr
               </OutlineButton>
             </VStack>
           </Box>
-          
+
+          {/* Tarjeta 4: Cerrar sesión */}
+          <Box bg={theme.colors.white} radius="md" padding="md" style={styles.card}>
+            <OutlineButton
+              style={styles.dangerOutline}
+              onPress={handleLogoutPress}
+            >
+              <HStack align="center" gap="xs">
+                <LogOut size={16} color={theme.colors.danger} />
+                <Label variant="caption" color={theme.colors.danger} style={{ fontWeight: 'bold' }}>
+                  Cerrar Sesión
+                </Label>
+              </HStack>
+            </OutlineButton>
+          </Box>
+
         </VStack>
       </ScrollView>
     </VStack>
@@ -230,7 +257,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 44 : 20,
     borderBottomLeftRadius: theme.radius.lg,
     borderBottomRightRadius: theme.radius.lg,
   },

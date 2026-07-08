@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { StyleSheet, View, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from './src/theme';
 import { Box, HStack, VStack } from './src/components/Layout';
 import { Label } from './src/components/Label';
@@ -13,9 +14,17 @@ import { hydrateFromSnapshot } from './src/database/offlineDbPersistence';
 import { Calendar, Settings } from 'lucide-react-native';
 
 import { syncService, AUTH_MODE } from './src/services/syncService';
-import { restoreSession, hasKeycloakAccessRole } from './src/services/keycloakAuth';
+import { restoreSession, hasKeycloakAccessRole, logoutFromKeycloak } from './src/services/keycloakAuth';
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<'LOGIN' | 'ITINERARY' | 'VISIT_DETAIL' | 'SETTINGS'>('LOGIN');
   const [visitas, setVisitas] = useState<any[]>([]);
   const [plantillas, setPlantillas] = useState<any[]>([]);
@@ -138,6 +147,17 @@ export default function App() {
     handleDescargarDatos();
   };
 
+  // Cierra la sesión de Keycloak (limpia memoria + SecureStore, ver
+  // keycloakAuth.ts) y manda de vuelta al login. En modo mock no hay sesión
+  // real que limpiar, pero llamar a logoutFromKeycloak() igual es inofensivo.
+  const handleLogout = () => {
+    logoutFromKeycloak();
+    setCurrentScreen('LOGIN');
+    setVisitas([]);
+    setPlantillas([]);
+    setProfesionalNombre(undefined);
+  };
+
   const handleSelectVisita = (id: string) => {
     setSelectedVisitaId(id);
     setCurrentScreen('VISIT_DETAIL');
@@ -218,6 +238,7 @@ export default function App() {
             <SettingsScreen
               isOnline={isOnline}
               onToggleOnline={setIsOnline}
+              onLogout={handleLogout}
             />
           )}
         </View>
@@ -281,7 +302,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   screenContainer: {
     flex: 1,
