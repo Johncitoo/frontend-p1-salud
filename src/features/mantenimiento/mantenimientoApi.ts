@@ -17,3 +17,10 @@ export const reintentarPedido = async (id: string) =>
     `/mantenimiento/inspecciones/${id}/reintentar-pedido`,
     {},
   )
+
+// Paso 14: el técnico instaló los componentes y cierra la orden de trabajo.
+export const finalizarIntervencion = async (id: string, notas?: string) =>
+  await apiPost<InspeccionMantenimiento, { notas?: string }>(
+    `/mantenimiento/inspecciones/${id}/finalizar`,
+    { notas },
+  )

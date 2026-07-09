@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, PackageCheck, Plus, RefreshCw, Wrench, X } from 'lucide-react'
-import { getRepuestosCatalogo, getInspecciones, createInspeccion, reintentarPedido } from './mantenimientoApi'
+import { AlertTriangle, CheckCircle2, ClipboardCheck, PackageCheck, Plus, RefreshCw, Wrench, X } from 'lucide-react'
+import { getRepuestosCatalogo, getInspecciones, createInspeccion, reintentarPedido, finalizarIntervencion } from './mantenimientoApi'
 import type { CreateInspeccionInput, InspeccionMantenimiento } from './types'
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiGet } from '@/lib/api'
@@ -29,6 +29,8 @@ const emptyForm = {
 
 const estadoBadge = (estado: string) => {
   switch (estado) {
+    case 'FINALIZADA':
+      return { label: 'Orden finalizada', cls: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' }
     case 'PEDIDO_ENVIADO':
       return { label: 'Pedido enviado', cls: 'bg-green-500/20 text-green-400 border border-green-500/30' }
     case 'PEDIDO_RECHAZADO':
@@ -44,6 +46,8 @@ export default function MantenimientoPage() {
   // sku -> cantidad de los repuestos marcados.
   const [repuestosSel, setRepuestosSel] = useState<Record<string, number>>({})
   const [formError, setFormError] = useState('')
+  const [finalizarTarget, setFinalizarTarget] = useState<InspeccionMantenimiento | null>(null)
+  const [finalizarNotas, setFinalizarNotas] = useState('')
   const queryClient = useQueryClient()
   const session = useCurrentUser()
   const canRegistrar = ['ADMIN', 'COORDINADOR', 'PROFESIONAL'].includes(session.rol)
@@ -80,6 +84,15 @@ export default function MantenimientoPage() {
   const reintentarMutation = useMutation({
     mutationFn: reintentarPedido,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspeccionesMantenimiento'] }),
+  })
+
+  const finalizarMutation = useMutation({
+    mutationFn: ({ id, notas }: { id: string; notas?: string }) => finalizarIntervencion(id, notas),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inspeccionesMantenimiento'] })
+      setFinalizarTarget(null)
+      setFinalizarNotas('')
+    },
   })
 
   const toggleRepuesto = (sku: string) => {
@@ -188,22 +201,37 @@ export default function MantenimientoPage() {
                           <p className='mt-1 max-w-xs text-xs text-red-400'>{insp.pedidoError}</p>
                         )}
                       </td>
-                      <td className='px-6 py-4 text-right'>
-                        {insp.estado === 'PEDIDO_RECHAZADO' && canReintentar ? (
-                          <button
-                            onClick={() => reintentarMutation.mutate(insp.id)}
-                            disabled={reintentarMutation.isPending && reintentarMutation.variables === insp.id}
-                            className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71]/20 px-3 py-1.5 text-xs font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71] hover:text-white disabled:opacity-50'
-                          >
-                            <RefreshCw className={`size-3.5 ${reintentarMutation.isPending && reintentarMutation.variables === insp.id ? 'animate-spin' : ''}`} />
-                            Reintentar
-                          </button>
-                        ) : insp.estado === 'PEDIDO_ENVIADO' ? (
-                          <span className='inline-flex items-center gap-1.5 text-xs text-green-400'>
-                            <PackageCheck className='size-3.5' /> Enviado
-                          </span>
+                      <td className='px-6 py-4'>
+                        {insp.estado === 'FINALIZADA' ? (
+                          <div className='flex flex-col items-end gap-1 text-right'>
+                            <span className='inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300'>
+                              <CheckCircle2 className='size-3.5' /> Orden finalizada
+                            </span>
+                            {insp.intervencionAt && (
+                              <span className='text-xs text-[#9CBFC1]'>{new Date(insp.intervencionAt).toLocaleString('es-CL')}</span>
+                            )}
+                          </div>
                         ) : (
-                          <span className='text-xs text-slate-500'>—</span>
+                          <div className='flex items-center justify-end gap-2'>
+                            {insp.estado === 'PEDIDO_RECHAZADO' && canReintentar && (
+                              <button
+                                onClick={() => reintentarMutation.mutate(insp.id)}
+                                disabled={reintentarMutation.isPending && reintentarMutation.variables === insp.id}
+                                className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71]/20 px-3 py-1.5 text-xs font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71] hover:text-white disabled:opacity-50'
+                              >
+                                <RefreshCw className={`size-3.5 ${reintentarMutation.isPending && reintentarMutation.variables === insp.id ? 'animate-spin' : ''}`} />
+                                Reintentar
+                              </button>
+                            )}
+                            {canRegistrar && (
+                              <button
+                                onClick={() => { setFinalizarNotas(''); setFinalizarTarget(insp) }}
+                                className='inline-flex items-center gap-2 rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-600 hover:text-white'
+                              >
+                                <ClipboardCheck className='size-3.5' /> Registrar intervención
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -331,6 +359,62 @@ export default function MantenimientoPage() {
               >
                 {createMutation.isPending && <div className='size-4 animate-spin rounded-full border-2 border-white/30 border-t-white'></div>}
                 Registrar y generar pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Paso 14: registrar intervención / finalizar orden */}
+      {finalizarTarget && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
+          <div className='w-full max-w-md rounded-2xl border border-[#3C6E71]/50 bg-[#182F3F] p-6 shadow-2xl'>
+            <div className='flex items-center justify-between border-b border-[#3C6E71]/30 pb-4'>
+              <h2 className='flex items-center gap-2 text-lg font-bold text-white'>
+                <ClipboardCheck className='size-5 text-emerald-300' />
+                Registrar intervención
+              </h2>
+              <button onClick={() => setFinalizarTarget(null)} className='rounded-lg p-1 text-[#9CBFC1] transition hover:bg-[#3C6E71]/30 hover:text-white'>
+                <X className='size-5' />
+              </button>
+            </div>
+
+            <p className='mt-4 text-sm text-[#D9D9D9]'>
+              Confirma que se instalaron los componentes en <span className='font-semibold text-white'>{finalizarTarget.equipo}</span>.
+              La orden de trabajo quedará <span className='font-semibold text-emerald-300'>finalizada</span>.
+            </p>
+
+            <div className='mt-3 rounded-lg border border-[#3C6E71]/30 bg-[#203C50] p-3'>
+              <p className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Componentes</p>
+              <ul className='mt-2 space-y-0.5'>
+                {finalizarTarget.repuestos.map((r) => (
+                  <li key={r.sku} className='text-sm text-white'>{r.nombre ?? r.sku} <span className='text-xs text-[#9CBFC1]'>×{r.cantidad}</span></li>
+                ))}
+              </ul>
+            </div>
+
+            <div className='mt-4'>
+              <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Notas de la intervención</label>
+              <textarea
+                value={finalizarNotas}
+                onChange={(e) => setFinalizarNotas(e.target.value)}
+                rows={3}
+                placeholder='Ej. Se instaló filtro HEPA y batería nueva; equipo operativo.'
+                className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+              />
+            </div>
+
+            <div className='mt-6 flex justify-end gap-3'>
+              <button onClick={() => setFinalizarTarget(null)} className='rounded-xl border border-[#3C6E71]/40 px-4 py-2 text-sm font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71]/20'>
+                Cancelar
+              </button>
+              <button
+                onClick={() => finalizarMutation.mutate({ id: finalizarTarget.id, notas: finalizarNotas.trim() || undefined })}
+                disabled={finalizarMutation.isPending}
+                className='inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50'
+              >
+                {finalizarMutation.isPending && <div className='size-4 animate-spin rounded-full border-2 border-white/30 border-t-white'></div>}
+                Finalizar orden
               </button>
             </div>
           </div>
