@@ -7,7 +7,7 @@ import { PrimaryButton, OutlineButton } from '../components/Button';
 import { db } from '../database/offlineDb';
 import { clearSnapshot } from '../database/offlineDbPersistence';
 import { syncService } from '../services/syncService';
-import { Wifi, WifiOff, Database, RefreshCw, Trash2, ClipboardList, LogOut } from 'lucide-react-native';
+import { Wifi, WifiOff, Database, RefreshCw, Trash2, ClipboardList, LogOut, AlertTriangle } from 'lucide-react-native';
 
 interface SettingsScreenProps {
   isOnline: boolean;
@@ -41,6 +41,27 @@ export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: S
     const interval = setInterval(loadLocalStats, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const activeQueueItems = queueItems.filter((item) => !item.requiereRevision);
+  const stuckQueueItems = queueItems.filter((item) => item.requiereRevision);
+
+  const handleDescartarItem = (item: any) => {
+    Alert.alert(
+      "Descartar registro",
+      "Este registro no se pudo subir tras varios intentos. Descartarlo lo elimina solo a él (el resto de tu cola y tus datos guardados no se ven afectados).",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Descartar",
+          style: "destructive",
+          onPress: async () => {
+            await db.syncQueue.delete(item.id);
+            await loadLocalStats();
+          },
+        },
+      ]
+    );
+  };
 
   const handleSyncNow = async () => {
     if (!isOnline) {
@@ -149,17 +170,17 @@ export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: S
             <VStack gap="sm">
               <HStack justify="space-between" align="center">
                 <Label variant="h2" color={theme.colors.yaleBlue}>Cola de Envío Pendiente</Label>
-                {queueItems.length > 0 && (
+                {activeQueueItems.length > 0 && (
                   <Box bg={theme.colors.danger} radius="round" padding={4} style={styles.badgeCount}>
                     <Label variant="caption" color={theme.colors.white} style={{ fontWeight: 'bold', fontSize: 12 }}>
-                      {queueItems.length}
+                      {activeQueueItems.length}
                     </Label>
                   </Box>
                 )}
               </HStack>
               <Label variant="caption">Registros clínicos guardados localmente esperando señal para subirse al back.</Label>
-              
-              {queueItems.length === 0 ? (
+
+              {activeQueueItems.length === 0 ? (
                 <Box padding="lg" align="center" bg="#F7FAF9" radius="sm" style={styles.emptyBox}>
                   <Label variant="body" color={theme.colors.success} style={{ fontWeight: '600' }}>
                     ✓ Todos los datos están sincronizados
@@ -167,7 +188,7 @@ export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: S
                 </Box>
               ) : (
                 <VStack gap="xs" style={styles.queueList}>
-                  {queueItems.map((item, idx) => (
+                  {activeQueueItems.map((item, idx) => (
                     <Box key={item.id || idx} bg="#FAF8F5" style={{ borderWidth: 1, borderColor: '#F0ECE4' }} radius="sm" padding="sm">
                       <HStack justify="space-between" align="center">
                         <Label variant="body" style={{ fontWeight: 'bold' }} color={theme.colors.graphite}>
@@ -177,17 +198,24 @@ export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: S
                           ID: {item.visita_id.substring(0, 5)}...
                         </Label>
                       </HStack>
-                      <Label variant="caption" color={theme.colors.grayText} style={{ marginTop: 2 }}>
-                        Guardado local: {formatTimestamp(item.timestamp)}
-                      </Label>
+                      <HStack justify="space-between" align="center" style={{ marginTop: 2 }}>
+                        <Label variant="caption" color={theme.colors.grayText}>
+                          Guardado local: {formatTimestamp(item.timestamp)}
+                        </Label>
+                        {!!item.intentos && (
+                          <Label variant="caption" color={theme.colors.danger}>
+                            {item.intentos} intento{item.intentos === 1 ? '' : 's'} fallido{item.intentos === 1 ? '' : 's'}
+                          </Label>
+                        )}
+                      </HStack>
                     </Box>
                   ))}
                 </VStack>
               )}
 
-              <PrimaryButton 
-                isLoading={isSyncing} 
-                disabled={queueItems.length === 0 || !isOnline}
+              <PrimaryButton
+                isLoading={isSyncing}
+                disabled={activeQueueItems.length === 0 || !isOnline}
                 onPress={handleSyncNow}
                 style={{ marginTop: 8 }}
               >
@@ -195,6 +223,47 @@ export default function SettingsScreen({ isOnline, onToggleOnline, onLogout }: S
               </PrimaryButton>
             </VStack>
           </Box>
+
+          {/* Tarjeta 2b: Registros que requieren revisión manual (se sacaron de la
+              cola activa tras fallar repetidas veces, para no bloquear al resto). */}
+          {stuckQueueItems.length > 0 && (
+            <Box bg={theme.colors.white} radius="md" padding="md" style={[styles.card, styles.stuckCard]}>
+              <VStack gap="sm">
+                <HStack align="center" gap="xs">
+                  <AlertTriangle size={20} color={theme.colors.danger} />
+                  <Label variant="h2" color={theme.colors.danger}>Requieren revisión ({stuckQueueItems.length})</Label>
+                </HStack>
+                <Label variant="caption">
+                  Estos registros fallaron varias veces al subirse (dato inválido, foto ilegible, etc.) y ya no se
+                  reintentan solos, para no trabar el resto de tu cola. Revísalos o descártalos uno por uno.
+                </Label>
+                <VStack gap="xs">
+                  {stuckQueueItems.map((item, idx) => (
+                    <Box key={item.id || idx} bg="#FDF3F1" style={{ borderWidth: 1, borderColor: '#F3D9D3' }} radius="sm" padding="sm">
+                      <HStack justify="space-between" align="center">
+                        <Label variant="body" style={{ fontWeight: 'bold' }} color={theme.colors.graphite}>
+                          {item.tipo === 'FICHA_CLINICA' ? '📝 Ficha Clínica' : item.tipo === 'CHECK_IN' ? '🚪 Check-In GPS' : item.tipo === 'CHECK_OUT' ? '🚗 Check-Out GPS' : item.tipo}
+                        </Label>
+                        <Label variant="caption" color={theme.colors.grayText}>
+                          ID: {item.visita_id.substring(0, 5)}...
+                        </Label>
+                      </HStack>
+                      {!!item.ultimoError && (
+                        <Label variant="caption" color={theme.colors.grayText} style={{ marginTop: 2 }} numberOfLines={2}>
+                          {item.ultimoError}
+                        </Label>
+                      )}
+                      <TouchableOpacity onPress={() => handleDescartarItem(item)} style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                        <Label variant="caption" color={theme.colors.danger} style={{ fontWeight: 'bold' }}>
+                          Descartar este registro
+                        </Label>
+                      </TouchableOpacity>
+                    </Box>
+                  ))}
+                </VStack>
+              </VStack>
+            </Box>
+          )}
 
           {/* Tarjeta 3: Estado de la Base de Datos Local */}
           <Box bg={theme.colors.white} radius="md" padding="md" style={styles.card}>
@@ -267,6 +336,9 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: '#EAEAEA',
+  },
+  stuckCard: {
+    borderColor: '#F3D9D3',
   },
   switchRow: {
     borderWidth: 1,

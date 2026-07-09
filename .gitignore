@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# dotenv environment variable files (no había ninguna regla acá — el .env
+# real con VITE_API_URL/VITE_KEYCLOAK_* quedó committeado)
+.env*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

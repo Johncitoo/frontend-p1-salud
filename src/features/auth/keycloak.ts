@@ -1,4 +1,5 @@
 import Keycloak from 'keycloak-js'
+import { clearAllDrafts } from '@/features/ficha-clinica/draftStorage'
 
 export const keycloak = new Keycloak({
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost',
@@ -43,10 +44,15 @@ export const loginWithKeycloak = async () => {
   })
 }
 
-export const logoutFromKeycloak = () =>
-  keycloak.logout({
+export const logoutFromKeycloak = () => {
+  // Datos clínicos (borradores de fichas) no deben sobrevivir al cierre de sesión en
+  // un equipo compartido — ver draftStorage.ts.
+  clearAllDrafts()
+
+  return keycloak.logout({
     redirectUri: window.location.origin,
   })
+}
 
 export const getKeycloakAccessRoles = () =>
   keycloak.tokenParsed?.realm_access?.roles ?? []
@@ -67,4 +73,15 @@ export const getValidKeycloakToken = async () => {
   }
 
   return keycloak.token
+}
+
+// Evento global para avisar que la sesión de Keycloak expiró (el refresh falló:
+// refresh token vencido/revocado, o Keycloak no respondió). api.ts lo dispara en vez
+// de mandar la petición sin Authorization; AuthSessionContext lo escucha para sacar
+// al usuario a una pantalla de "sesión expirada" en vez de dejar que la petición
+// falle con un 401 disfrazado de error de red genérico.
+export const SESSION_EXPIRED_EVENT = 'kc-session-expired'
+
+export const reportSessionExpired = (message: string) => {
+  window.dispatchEvent(new CustomEvent<string>(SESSION_EXPIRED_EVENT, { detail: message }))
 }

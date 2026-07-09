@@ -30,8 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files (antes solo cubría *.local; el .env real con las URLs de
+# Keycloak/backend quedó committeado porque no matcheaba ese patrón)
+.env*
+!.env.example
 
 # typescript
 *.tsbuildinfo

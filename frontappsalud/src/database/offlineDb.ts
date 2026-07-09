@@ -51,6 +51,13 @@ export interface SyncQueueItem {
   visita_id: string;
   data: any;
   timestamp: number;
+  // Cuántas veces falló este ítem al intentar sincronizarse. Tras MAX_INTENTOS_SYNC
+  // (ver syncService.ts) se marca requiereRevision y se saca de la cola activa, para
+  // que un solo ítem con datos corruptos (fecha inválida, foto ilegible) no bloquee
+  // para siempre a los que están detrás en la cola.
+  intentos?: number;
+  requiereRevision?: boolean;
+  ultimoError?: string;
 }
 
 class ClinicaOfflineDB extends Dexie {

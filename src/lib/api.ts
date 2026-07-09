@@ -1,8 +1,14 @@
 import { getMockAuthHeaders } from '@/features/auth/mockAuth'
-import { getValidKeycloakToken } from '@/features/auth/keycloak'
+import { getValidKeycloakToken, reportSessionExpired } from '@/features/auth/keycloak'
 
 const DEFAULT_API_URL = 'http://localhost:3000'
 export const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL
+
+// Debe coincidir con el chequeo de AuthSessionContext (ver AUTH_MODE ahí): en modo
+// mock nunca se debe intentar Keycloak, y en modo keycloak un fallo real de sesión
+// nunca debe caer a headers mock (el backend en AUTH_MODE=keycloak los ignora de
+// todas formas, así que solo produce un 401 disfrazado de "error de red").
+const IS_MOCK = (import.meta.env.VITE_AUTH_MODE as string) === 'mock'
 
 const FETCH_TIMEOUT_MS = 30_000 // 30 seconds
 
@@ -53,11 +59,23 @@ async function parseApiResponse<TResponse>(response: Response): Promise<TRespons
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (IS_MOCK) {
+    return getMockAuthHeaders()
+  }
+
   try {
     const token = await getValidKeycloakToken()
     return { Authorization: `Bearer ${token}` }
-  } catch {
-    return getMockAuthHeaders()
+  } catch (error) {
+    // El refresh de Keycloak falló (refresh token vencido/revocado, o Keycloak no
+    // respondió): esto es una sesión expirada, no un error de red genérico. Avisamos
+    // a AuthSessionContext para que redirija a login con un mensaje claro, en vez de
+    // mandar la petición sin Authorization y dejar que el backend la rechace con un
+    // 401 que el usuario ve como un fallo aleatorio.
+    console.error('Fallo al renovar el token de Keycloak:', error)
+    const message = 'Tu sesión expiró. Inicia sesión de nuevo para continuar.'
+    reportSessionExpired(message)
+    throw new Error(message)
   }
 }
 

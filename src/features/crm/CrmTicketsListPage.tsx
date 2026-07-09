@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, AlertTriangle, Plus, ShieldAlert, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Plus, ShieldAlert } from 'lucide-react'
 import { getCrmTickets, getCrmTicketExternalStatus, createCrmTicket, updateCrmTicketEstado } from './crmApi'
 import type { CrmTicket, CreateCrmTicketInput, CrmEstado } from './types'
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiGet } from '@/lib/api'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type PacienteOption = {
   id: string
@@ -317,22 +318,16 @@ export default function CrmTicketsListPage() {
 
       {/* Modal de Detalle de CRM */}
       {selectedTicket && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
-          <div className='w-full max-w-lg rounded-2xl border border-[#3C6E71]/50 bg-[#182F3F] p-6 shadow-2xl'>
-            <div className='flex items-center justify-between border-b border-[#3C6E71]/30 pb-4'>
-              <h2 className='flex items-center gap-2 text-lg font-bold text-white'>
-                <ShieldAlert className='size-5 text-orange-400' />
-                Estado en CRM Externo
-              </h2>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className='rounded-lg p-1 text-[#9CBFC1] transition hover:bg-[#3C6E71]/30 hover:text-white'
-              >
-                <X className='size-5' />
-              </button>
-            </div>
+      <Dialog open onOpenChange={(open) => { if (!open) setSelectedTicket(null) }}>
+        <DialogContent className='w-full max-w-lg border border-[#3C6E71]/50 !bg-[#182F3F] text-white shadow-2xl'>
+          <DialogHeader className='border-b border-[#3C6E71]/30 pb-4'>
+            <DialogTitle className='flex items-center gap-2 text-lg font-bold text-white'>
+              <ShieldAlert className='size-5 text-orange-400' />
+              Estado en CRM Externo
+            </DialogTitle>
+          </DialogHeader>
 
-            <div className='mt-6 space-y-6'>
+            <div className='space-y-6'>
               <div className='rounded-xl border border-[#3C6E71]/30 bg-[#203C50] p-4'>
                 <h3 className='text-xs font-bold uppercase tracking-wider text-[#9CBFC1]'>Datos Locales (Salud)</h3>
                 <div className='mt-3 space-y-2'>
@@ -395,36 +390,29 @@ export default function CrmTicketsListPage() {
               </div>
             </div>
 
-            <div className='mt-8 text-right'>
+            <DialogFooter>
               <button
                 onClick={() => setSelectedTicket(null)}
                 className='rounded-xl bg-[#3C6E71] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2A4D4F]'
               >
                 Cerrar
               </button>
-            </div>
-          </div>
-        </div>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       )}
 
       {/* Modal de alta MANUAL de ticket de soporte */}
-      {isCreateOpen && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
-          <div className='w-full max-w-lg rounded-2xl border border-[#3C6E71]/50 bg-[#182F3F] p-6 shadow-2xl'>
-            <div className='flex items-center justify-between border-b border-[#3C6E71]/30 pb-4'>
-              <h2 className='flex items-center gap-2 text-lg font-bold text-white'>
-                <Plus className='size-5 text-[#9CBFC1]' />
-                Crear ticket de soporte
-              </h2>
-              <button
-                onClick={() => setIsCreateOpen(false)}
-                className='rounded-lg p-1 text-[#9CBFC1] transition hover:bg-[#3C6E71]/30 hover:text-white'
-              >
-                <X className='size-5' />
-              </button>
-            </div>
+      <Dialog open={isCreateOpen} onOpenChange={(open) => { if (!open) setIsCreateOpen(false) }}>
+        <DialogContent className='w-full max-w-lg border border-[#3C6E71]/50 !bg-[#182F3F] text-white shadow-2xl'>
+          <DialogHeader className='border-b border-[#3C6E71]/30 pb-4'>
+            <DialogTitle className='flex items-center gap-2 text-lg font-bold text-white'>
+              <Plus className='size-5 text-[#9CBFC1]' />
+              Crear ticket de soporte
+            </DialogTitle>
+          </DialogHeader>
 
-            <p className='mt-4 text-xs text-[#9CBFC1]'>
+            <p className='text-xs text-[#9CBFC1]'>
               Este ticket se enviará al CRM de soporte (Proyecto 07). Úsalo para
               situaciones que requieren seguimiento con el cliente/paciente. Los avisos
               automáticos del sistema (visitas atrasadas, sensores IoT) no pasan por aquí.
@@ -548,7 +536,7 @@ export default function CrmTicketsListPage() {
               )}
             </div>
 
-            <div className='mt-6 flex justify-end gap-3'>
+            <DialogFooter>
               <button
                 onClick={() => setIsCreateOpen(false)}
                 className='rounded-xl border border-[#3C6E71]/40 px-4 py-2 text-sm font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71]/20'
@@ -565,10 +553,9 @@ export default function CrmTicketsListPage() {
                 )}
                 Crear ticket
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import {
   initKeycloakWithTimeout,
   keycloak,
   logoutFromKeycloak,
+  SESSION_EXPIRED_EVENT,
 } from './keycloak'
 import { fetchCurrentUser, type CurrentUserProfile } from '@/lib/api'
 
@@ -90,6 +91,24 @@ export function AuthSessionProvider({ children }: { children: React.ReactNode })
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // api.ts dispara esto cuando el refresh de Keycloak falla a mitad de una petición
+  // (sesión expirada): en vez de dejar que esa petición siga con un 401 disfrazado de
+  // error de red, sacamos al usuario a la pantalla de error con un mensaje claro y el
+  // botón "Cerrar sesion" (ya presente para access-denied/error) para volver a loguearse.
+  useEffect(() => {
+    if (IS_MOCK) return
+
+    const handleSessionExpired = (event: Event) => {
+      const message = (event as CustomEvent<string>).detail
+      setProfile(null)
+      setError(message || 'Tu sesión expiró. Inicia sesión de nuevo.')
+      setStatus('error')
+    }
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
   }, [])
 
   const value = useMemo<AuthSessionContextValue>(

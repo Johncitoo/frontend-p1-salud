@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Activity, Stethoscope, AlertTriangle, Plus, X, Search, RefreshCw, BatteryLow, Wifi, WifiOff, ChevronLeft, ChevronRight, Hash, Clock } from 'lucide-react'
+import { ArrowLeft, Activity, Stethoscope, AlertTriangle, Plus, Search, RefreshCw, BatteryLow, Wifi, WifiOff, ChevronLeft, ChevronRight, Hash, Clock } from 'lucide-react'
 import { apiGet, apiPost } from '@/lib/api'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type PatientRow = {
   id: string
@@ -396,15 +397,11 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
       </section>
 
       {/* Modal Asignar Dispositivo */}
-      {isModalOpen && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4'>
-          <div className='flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white p-6 shadow-xl'>
-            <div className='mb-4 flex items-center justify-between'>
-              <h2 className='text-xl font-bold text-slate-900'>Vincular Dispositivo IoT</h2>
-              <button onClick={() => setIsModalOpen(false)} className='text-slate-400 hover:text-slate-600'>
-                <X className='size-5' />
-              </button>
-            </div>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) setIsModalOpen(false) }}>
+        <DialogContent className='flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl p-6 shadow-xl'>
+          <DialogHeader>
+            <DialogTitle className='text-xl font-bold text-slate-900'>Vincular Dispositivo IoT</DialogTitle>
+          </DialogHeader>
 
             <form onSubmit={handleAssignDevice} className='flex min-h-0 flex-1 flex-col'>
               {/* Filtros */}
@@ -542,7 +539,7 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
                 </div>
               )}
 
-              <div className='flex justify-end gap-3 pt-4'>
+              <DialogFooter className='pt-4'>
                 <button
                   type='button'
                   onClick={() => setIsModalOpen(false)}
@@ -557,11 +554,10 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
                 >
                   {isSubmitting ? 'Guardando...' : selectedDevice ? `Vincular ${selectedDevice.sensorId}` : 'Selecciona un dispositivo'}
                 </button>
-              </div>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

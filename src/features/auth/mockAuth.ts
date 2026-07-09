@@ -1,4 +1,5 @@
 import type { CurrentUserProfile } from '@/lib/api'
+import { clearAllDrafts } from '@/features/ficha-clinica/draftStorage'
 
 export type MockRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR'
 
@@ -55,6 +56,9 @@ export const loginWithMockRole = (role: MockRole): MockUserOption => {
 
 export const logoutMock = () => {
   window.localStorage.removeItem(STORAGE_KEY)
+  // Datos clínicos (borradores de fichas) no deben sobrevivir al cierre de sesión en
+  // un equipo compartido — ver draftStorage.ts.
+  clearAllDrafts()
 }
 
 export const getMockAuthHeaders = (): Record<string, string> => {

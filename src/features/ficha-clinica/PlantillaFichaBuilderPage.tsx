@@ -371,6 +371,10 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
     const validationError = validate()
     if (validationError) {
       setError(validationError)
+      // El mensaje de error se muestra arriba del todo del formulario; sin este
+      // scroll, si el usuario está editando un campo más abajo (ej. "Campo 1"),
+      // el error queda fuera de vista y parece que el botón no hizo nada.
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
 
@@ -425,6 +429,7 @@ const PlantillaFichaBuilderPage = ({ plantillaId }: PlantillaFichaBuilderPagePro
       }, 900)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la plantilla.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setIsSaving(false)
     }

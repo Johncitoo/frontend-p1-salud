@@ -113,6 +113,32 @@ function opcionesComoArray(opciones?: Record<string, unknown> | null): string[] 
 // el backend rechaza con 409 y queda pegado reintentando para siempre.
 let sincronizacionEnCurso = false;
 
+// Tras este número de fallos consecutivos, un ítem se saca de la cola activa
+// (requiereRevision = true) en vez de seguir reintentándose para siempre.
+const MAX_INTENTOS_SYNC = 3;
+
+// Registra un fallo de sincronización en el ítem (no lo borra: solo lo deja listo
+// para reintentar en la próxima pasada, o en cuarentena si ya agotó sus intentos).
+// El sync corre cada 20s (ver App.tsx) mientras haya cola pendiente: un corte real
+// de señal a mitad de una pasada no es culpa del ítem (todos fallarían igual), así
+// que no debe consumir su presupuesto de intentos ni quedar marcado como corrupto.
+function esErrorDeRed(error: unknown): boolean {
+  const mensaje = error instanceof Error ? error.message : String(error);
+  return /network|fetch|conexi[oó]n|internet/i.test(mensaje);
+}
+
+async function registrarFalloItem(item: SyncQueueItem, motivo: string): Promise<void> {
+  const intentos = (item.intentos ?? 0) + 1;
+  const requiereRevision = intentos >= MAX_INTENTOS_SYNC;
+  await db.syncQueue.update(item.id!, { intentos, requiereRevision, ultimoError: motivo });
+  if (requiereRevision) {
+    console.error(
+      `[SYNC] Ítem ${item.id} (${item.tipo}, visita ${item.visita_id}) alcanzó ${intentos} intentos fallidos ` +
+      `y se saca de la cola activa (requiere revisión manual). Último error: ${motivo}`
+    );
+  }
+}
+
 export const syncService = {
 
   /**
@@ -318,7 +344,9 @@ export const syncService = {
     sincronizacionEnCurso = true;
 
     try {
-    const queue = await db.syncQueue.toArray();
+    // Los ítems en cuarentena (requiereRevision) no se reintentan automáticamente:
+    // ya agotaron sus intentos y quedan esperando revisión manual (ver SettingsScreen).
+    const queue = (await db.syncQueue.toArray()).filter((item) => !item.requiereRevision);
     let procesados = 0;
     let fallidos = 0;
 
@@ -349,8 +377,9 @@ export const syncService = {
               procesados++;
               continue;
             }
-            console.error(`[SYNC DEBUG] checkpoint ${item.tipo} falló`, checkpointRes.status, await checkpointRes.text());
-            fallidos++; continue;
+            const texto = await checkpointRes.text();
+            console.error(`[SYNC DEBUG] checkpoint ${item.tipo} falló`, checkpointRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `checkpoint ${item.tipo}: HTTP ${checkpointRes.status} ${texto}`); continue;
           }
 
           const estadoRes = item.tipo === 'CHECK_IN'
@@ -365,8 +394,9 @@ export const syncService = {
                 body: JSON.stringify({}),
               });
           if (!estadoRes.ok) {
-            console.error(`[SYNC DEBUG] PATCH estado/completar falló`, estadoRes.status, await estadoRes.text());
-            fallidos++; continue;
+            const texto = await estadoRes.text();
+            console.error(`[SYNC DEBUG] PATCH estado/completar falló`, estadoRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `PATCH estado/completar: HTTP ${estadoRes.status} ${texto}`); continue;
           }
         } else if (item.tipo === 'EN_CAMINO') {
           // Dispara la notificación al paciente de "profesional en camino" (ver
@@ -377,8 +407,9 @@ export const syncService = {
             body: JSON.stringify({ estado: 'EN_CAMINO' }),
           });
           if (!enCaminoRes.ok) {
-            console.error(`[SYNC DEBUG] PATCH estado EN_CAMINO falló`, enCaminoRes.status, await enCaminoRes.text());
-            fallidos++; continue;
+            const texto = await enCaminoRes.text();
+            console.error(`[SYNC DEBUG] PATCH estado EN_CAMINO falló`, enCaminoRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `PATCH estado EN_CAMINO: HTTP ${enCaminoRes.status} ${texto}`); continue;
           }
         } else if (item.tipo === 'FICHA_CLINICA') {
           const fichaRes = await fetch(`${API_BASE_URL}/fichas-clinicas`, {
@@ -406,16 +437,19 @@ export const syncService = {
               const existentes = existentesRes.ok ? await existentesRes.json() : [];
               if (!existentes[0]) {
                 console.error(`[SYNC DEBUG] No se pudo recuperar la ficha existente tras 409 para visita ${item.visita_id}`);
-                fallidos++; continue;
+                fallidos++; await registrarFalloItem(item, `409 en /fichas-clinicas pero no se pudo recuperar la ficha existente de la visita ${item.visita_id}`); continue;
               }
               fichaCreada = existentes[0];
             } else {
-              console.error(`[SYNC DEBUG] POST /fichas-clinicas falló`, fichaRes.status, await fichaRes.text());
-              fallidos++; continue;
+              const texto = await fichaRes.text();
+              console.error(`[SYNC DEBUG] POST /fichas-clinicas falló`, fichaRes.status, texto);
+              fallidos++; await registrarFalloItem(item, `POST /fichas-clinicas: HTTP ${fichaRes.status} ${texto}`); continue;
             }
           } else {
             fichaCreada = await fichaRes.json();
           }
+
+          console.warn(`[SYNC DEBUG] Ficha lista para adjuntar foto: id=${fichaCreada?.id} visita=${item.visita_id} tieneFoto=${!!item.data?.fotoLocalUri}`);
 
           // La foto se sube recién ahora, referenciando la ficha ya creada (a
           // diferencia de appBack, que primero subía la foto y luego la embebía como
@@ -443,7 +477,7 @@ export const syncService = {
             );
             if (uploadResult.status < 200 || uploadResult.status >= 300) {
               console.error(`[SYNC DEBUG] POST /documentos-adjuntos falló`, uploadResult.status, uploadResult.body);
-              fallidos++; continue;
+              fallidos++; await registrarFalloItem(item, `POST /documentos-adjuntos: HTTP ${uploadResult.status} ${uploadResult.body}`); continue;
             }
           }
         } else if (item.tipo === 'SOLICITUD_CONTINUIDAD') {
@@ -459,8 +493,9 @@ export const syncService = {
             }),
           });
           if (!alertaRes.ok) {
-            console.error(`[SYNC DEBUG] POST /alertas falló`, alertaRes.status, await alertaRes.text());
-            fallidos++; continue;
+            const texto = await alertaRes.text();
+            console.error(`[SYNC DEBUG] POST /alertas falló`, alertaRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `POST /alertas: HTTP ${alertaRes.status} ${texto}`); continue;
           }
         } else if (item.tipo === 'DIAGNOSTICO') {
           // Una visita admite múltiples diagnósticos (a diferencia de la ficha
@@ -474,8 +509,9 @@ export const syncService = {
             }),
           });
           if (!diagnosticoRes.ok) {
-            console.error(`[SYNC DEBUG] POST /diagnosticos falló`, diagnosticoRes.status, await diagnosticoRes.text());
-            fallidos++; continue;
+            const texto = await diagnosticoRes.text();
+            console.error(`[SYNC DEBUG] POST /diagnosticos falló`, diagnosticoRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `POST /diagnosticos: HTTP ${diagnosticoRes.status} ${texto}`); continue;
           }
         } else if (item.tipo === 'MEDICAMENTO') {
           const medicamentoRes = await fetch(`${API_BASE_URL}/medicamentos`, {
@@ -488,8 +524,9 @@ export const syncService = {
             }),
           });
           if (!medicamentoRes.ok) {
-            console.error(`[SYNC DEBUG] POST /medicamentos falló`, medicamentoRes.status, await medicamentoRes.text());
-            fallidos++; continue;
+            const texto = await medicamentoRes.text();
+            console.error(`[SYNC DEBUG] POST /medicamentos falló`, medicamentoRes.status, texto);
+            fallidos++; await registrarFalloItem(item, `POST /medicamentos: HTTP ${medicamentoRes.status} ${texto}`); continue;
           }
         }
 
@@ -497,10 +534,16 @@ export const syncService = {
         await db.syncQueue.delete(item.id!);
         procesados++;
       } catch (error) {
-        console.error(`Fallo de red al intentar sincronizar registro id: ${item.id}`, error);
+        console.error(`Fallo al intentar sincronizar registro id: ${item.id}`, error);
         fallidos++;
-        // Si hay un fallo de red general, rompemos el ciclo para evitar reintentar en bucle inútilmente
-        break;
+        if (esErrorDeRed(error)) {
+          // No es culpa del ítem: no cuenta intento, y seguimos con el resto de la
+          // cola (si de verdad no hay señal, las siguientes fallarán rápido igual).
+          continue;
+        }
+        // Dato corrupto del ítem (fecha inválida, archivo ilegible, etc.): cuenta
+        // como intento fallido, pero nunca bloquea al resto de la cola detrás de él.
+        await registrarFalloItem(item, error instanceof Error ? error.message : String(error));
       }
     }
 
