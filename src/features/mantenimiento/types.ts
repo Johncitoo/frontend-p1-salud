@@ -12,6 +12,15 @@ export interface RepuestoSolicitado {
 
 export type PrioridadMantenimiento = 'baja' | 'media' | 'alta' | 'urgente'
 
+export interface VersionInforme {
+  version: number
+  equipo: string
+  diagnostico?: string | null
+  motivo?: string | null
+  corregidoPorUsuarioId?: string | null
+  fecha: string
+}
+
 export interface InspeccionMantenimiento {
   id: string
   pacienteId: string
@@ -21,6 +30,8 @@ export interface InspeccionMantenimiento {
   prioridad: string
   repuestos: RepuestoSolicitado[]
   estado: string
+  version: number
+  historialVersiones: VersionInforme[]
   pedidoExternoId?: string | null
   pedidoEstadoExterno?: string | null
   pedidoError?: string | null
@@ -28,6 +39,13 @@ export interface InspeccionMantenimiento {
   intervencionNotas?: string | null
   createdAt: string
   updatedAt: string
+}
+
+// Paso 19: corrección del informe técnico (emite una nueva versión).
+export interface CorregirInformeInput {
+  diagnostico: string
+  equipo?: string
+  motivo?: string
 }
 
 export interface CreateInspeccionInput {

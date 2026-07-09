@@ -1,5 +1,5 @@
-import { apiGet, apiPost } from '@/lib/api'
-import type { RepuestoCatalogo, InspeccionMantenimiento, CreateInspeccionInput } from './types'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
+import type { RepuestoCatalogo, InspeccionMantenimiento, CreateInspeccionInput, CorregirInformeInput } from './types'
 
 export const getRepuestosCatalogo = async () =>
   await apiGet<RepuestoCatalogo[]>('/mantenimiento/repuestos')
@@ -23,4 +23,11 @@ export const finalizarIntervencion = async (id: string, notas?: string) =>
   await apiPost<InspeccionMantenimiento, { notas?: string }>(
     `/mantenimiento/inspecciones/${id}/finalizar`,
     { notas },
+  )
+
+// Paso 19: corrige el informe técnico y emite una nueva versión del documento.
+export const corregirInforme = async (id: string, input: CorregirInformeInput) =>
+  await apiPatch<InspeccionMantenimiento, CorregirInformeInput>(
+    `/mantenimiento/inspecciones/${id}/corregir`,
+    input,
   )

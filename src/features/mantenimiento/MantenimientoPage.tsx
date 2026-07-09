@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ClipboardCheck, PackageCheck, Plus, RefreshCw, Wrench, X } from 'lucide-react'
-import { getRepuestosCatalogo, getInspecciones, createInspeccion, reintentarPedido, finalizarIntervencion } from './mantenimientoApi'
-import type { CreateInspeccionInput, InspeccionMantenimiento } from './types'
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FileText, PackageCheck, Pencil, Plus, RefreshCw, Wrench, X } from 'lucide-react'
+import { getRepuestosCatalogo, getInspecciones, createInspeccion, reintentarPedido, finalizarIntervencion, corregirInforme } from './mantenimientoApi'
+import type { CreateInspeccionInput, InspeccionMantenimiento, CorregirInformeInput } from './types'
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiGet } from '@/lib/api'
 
@@ -52,6 +52,12 @@ export default function MantenimientoPage() {
   const session = useCurrentUser()
   const canRegistrar = ['ADMIN', 'COORDINADOR', 'PROFESIONAL'].includes(session.rol)
   const canReintentar = ['ADMIN', 'COORDINADOR'].includes(session.rol)
+  const canCorregir = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO'].includes(session.rol)
+
+  // Paso 19: corrección del informe técnico (emite una nueva versión).
+  const [correccion, setCorreccion] = useState<InspeccionMantenimiento | null>(null)
+  const [corrForm, setCorrForm] = useState({ diagnostico: '', equipo: '', motivo: '' })
+  const [corrError, setCorrError] = useState('')
 
   const { data: inspecciones = [], isLoading } = useQuery({
     queryKey: ['inspeccionesMantenimiento'],
@@ -94,6 +100,35 @@ export default function MantenimientoPage() {
       setFinalizarNotas('')
     },
   })
+
+  const corregirMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: CorregirInformeInput }) => corregirInforme(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inspeccionesMantenimiento'] })
+      setCorreccion(null)
+      setCorrError('')
+    },
+    onError: (err) => setCorrError(err instanceof Error ? err.message : 'No se pudo corregir el informe.'),
+  })
+
+  const openCorreccion = (insp: InspeccionMantenimiento) => {
+    setCorreccion(insp)
+    setCorrForm({ diagnostico: insp.diagnostico ?? '', equipo: insp.equipo, motivo: '' })
+    setCorrError('')
+  }
+
+  const handleCorregir = () => {
+    if (!correccion) return
+    if (!corrForm.diagnostico.trim()) return setCorrError('El diagnóstico no puede quedar vacío.')
+    corregirMutation.mutate({
+      id: correccion.id,
+      input: {
+        diagnostico: corrForm.diagnostico.trim(),
+        equipo: corrForm.equipo.trim() || undefined,
+        motivo: corrForm.motivo.trim() || undefined,
+      },
+    })
+  }
 
   const toggleRepuesto = (sku: string) => {
     setRepuestosSel((prev) => {
@@ -174,7 +209,19 @@ export default function MantenimientoPage() {
                   return (
                     <tr key={insp.id} className='transition-colors hover:bg-[#3C6E71]/10'>
                       <td className='px-6 py-4'>
-                        <p className='font-medium text-white'>{insp.equipo}</p>
+                        <p className='flex items-center gap-2 font-medium text-white'>
+                          {insp.equipo}
+                          <span
+                            title={insp.version > 1 ? `Informe corregido (${insp.version - 1} corrección/es)` : 'Versión original'}
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              insp.version > 1
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-[#3C6E71]/20 text-[#9CBFC1] border border-[#3C6E71]/30'
+                            }`}
+                          >
+                            v{insp.version}
+                          </span>
+                        </p>
                         <p className='mt-1 text-xs text-[#9CBFC1]'>{new Date(insp.createdAt).toLocaleString('es-CL')}</p>
                       </td>
                       <td className='px-6 py-4'>
@@ -201,38 +248,50 @@ export default function MantenimientoPage() {
                           <p className='mt-1 max-w-xs text-xs text-red-400'>{insp.pedidoError}</p>
                         )}
                       </td>
-                      <td className='px-6 py-4'>
-                        {insp.estado === 'FINALIZADA' ? (
-                          <div className='flex flex-col items-end gap-1 text-right'>
-                            <span className='inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300'>
-                              <CheckCircle2 className='size-3.5' /> Orden finalizada
-                            </span>
-                            {insp.intervencionAt && (
-                              <span className='text-xs text-[#9CBFC1]'>{new Date(insp.intervencionAt).toLocaleString('es-CL')}</span>
-                            )}
-                          </div>
-                        ) : (
-                          <div className='flex items-center justify-end gap-2'>
-                            {insp.estado === 'PEDIDO_RECHAZADO' && canReintentar && (
-                              <button
-                                onClick={() => reintentarMutation.mutate(insp.id)}
-                                disabled={reintentarMutation.isPending && reintentarMutation.variables === insp.id}
-                                className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71]/20 px-3 py-1.5 text-xs font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71] hover:text-white disabled:opacity-50'
-                              >
-                                <RefreshCw className={`size-3.5 ${reintentarMutation.isPending && reintentarMutation.variables === insp.id ? 'animate-spin' : ''}`} />
-                                Reintentar
-                              </button>
-                            )}
-                            {canRegistrar && (
-                              <button
-                                onClick={() => { setFinalizarNotas(''); setFinalizarTarget(insp) }}
-                                className='inline-flex items-center gap-2 rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-600 hover:text-white'
-                              >
-                                <ClipboardCheck className='size-3.5' /> Registrar intervención
-                              </button>
-                            )}
-                          </div>
-                        )}
+                      <td className='px-6 py-4 text-right'>
+                        <div className='flex items-center justify-end gap-2'>
+                          {canCorregir && (
+                            <button
+                              onClick={() => openCorreccion(insp)}
+                              title='Corregir informe y emitir nueva versión'
+                              className='inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/30 hover:text-amber-200'
+                            >
+                              <Pencil className='size-3.5' />
+                              Corregir
+                            </button>
+                          )}
+                          {insp.estado === 'FINALIZADA' ? (
+                            <div className='flex flex-col items-end gap-1 text-right'>
+                              <span className='inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300'>
+                                <CheckCircle2 className='size-3.5' /> Orden finalizada
+                              </span>
+                              {insp.intervencionAt && (
+                                <span className='text-xs text-[#9CBFC1]'>{new Date(insp.intervencionAt).toLocaleString('es-CL')}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              {insp.estado === 'PEDIDO_RECHAZADO' && canReintentar && (
+                                <button
+                                  onClick={() => reintentarMutation.mutate(insp.id)}
+                                  disabled={reintentarMutation.isPending && reintentarMutation.variables === insp.id}
+                                  className='inline-flex items-center gap-2 rounded-lg bg-[#3C6E71]/20 px-3 py-1.5 text-xs font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71] hover:text-white disabled:opacity-50'
+                                >
+                                  <RefreshCw className={`size-3.5 ${reintentarMutation.isPending && reintentarMutation.variables === insp.id ? 'animate-spin' : ''}`} />
+                                  Reintentar
+                                </button>
+                              )}
+                              {canRegistrar && (
+                                <button
+                                  onClick={() => { setFinalizarNotas(''); setFinalizarTarget(insp) }}
+                                  className='inline-flex items-center gap-2 rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-600 hover:text-white'
+                                >
+                                  <ClipboardCheck className='size-3.5' /> Registrar intervención
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -415,6 +474,96 @@ export default function MantenimientoPage() {
               >
                 {finalizarMutation.isPending && <div className='size-4 animate-spin rounded-full border-2 border-white/30 border-t-white'></div>}
                 Finalizar orden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal corregir informe (Paso 19) */}
+      {correccion && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
+          <div className='max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#3C6E71]/50 bg-[#182F3F] p-6 shadow-2xl'>
+            <div className='flex items-center justify-between border-b border-[#3C6E71]/30 pb-4'>
+              <h2 className='flex items-center gap-2 text-lg font-bold text-white'>
+                <FileText className='size-5 text-amber-300' />
+                Corregir informe técnico
+              </h2>
+              <button onClick={() => setCorreccion(null)} className='rounded-lg p-1 text-[#9CBFC1] transition hover:bg-[#3C6E71]/30 hover:text-white'>
+                <X className='size-5' />
+              </button>
+            </div>
+
+            <p className='mt-4 text-xs text-[#9CBFC1]'>
+              Versión actual <span className='font-semibold text-white'>v{correccion.version}</span>. Al guardar se emitirá
+              la <span className='font-semibold text-amber-300'>v{correccion.version + 1}</span> y la actual quedará en el historial.
+            </p>
+
+            <div className='mt-4 space-y-4'>
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Equipo</label>
+                <input
+                  value={corrForm.equipo}
+                  onChange={(e) => setCorrForm((f) => ({ ...f, equipo: e.target.value }))}
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
+                />
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Diagnóstico / informe corregido *</label>
+                <textarea
+                  value={corrForm.diagnostico}
+                  onChange={(e) => setCorrForm((f) => ({ ...f, diagnostico: e.target.value }))}
+                  rows={4}
+                  placeholder='Corrige el informe (ej. número de serie correcto).'
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+                />
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Motivo de la corrección</label>
+                <input
+                  value={corrForm.motivo}
+                  onChange={(e) => setCorrForm((f) => ({ ...f, motivo: e.target.value }))}
+                  placeholder='Ej. Número de serie incorrecto en el informe original.'
+                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+                />
+              </div>
+
+              {correccion.historialVersiones?.length > 0 && (
+                <div className='rounded-lg border border-[#3C6E71]/40 bg-[#203C50] p-3'>
+                  <p className='mb-2 text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Historial de versiones</p>
+                  <ul className='space-y-1.5'>
+                    {correccion.historialVersiones.map((v) => (
+                      <li key={v.version} className='text-xs text-[#D9D9D9]'>
+                        <span className='font-semibold text-white'>v{v.version}</span>
+                        <span className='text-[#9CBFC1]'> — {new Date(v.fecha).toLocaleString('es-CL')}</span>
+                        {v.motivo && <span className='text-[#6B8A8C]'> · {v.motivo}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {corrError && (
+                <div className='flex items-start gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-400'>
+                  <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+                  {corrError}
+                </div>
+              )}
+            </div>
+
+            <div className='mt-6 flex justify-end gap-3'>
+              <button onClick={() => setCorreccion(null)} className='rounded-xl border border-[#3C6E71]/40 px-4 py-2 text-sm font-semibold text-[#9CBFC1] transition hover:bg-[#3C6E71]/20'>
+                Cancelar
+              </button>
+              <button
+                onClick={handleCorregir}
+                disabled={corregirMutation.isPending}
+                className='inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50'
+              >
+                {corregirMutation.isPending && <div className='size-4 animate-spin rounded-full border-2 border-white/30 border-t-white'></div>}
+                Guardar corrección
               </button>
             </div>
           </div>
