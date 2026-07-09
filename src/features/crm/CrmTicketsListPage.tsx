@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, AlertTriangle, Plus, ShieldAlert, X } from 'lucide-react'
-import { getCrmTickets, getCrmTicketExternalStatus, createCrmTicket } from './crmApi'
-import type { CrmTicket, CreateCrmTicketInput } from './types'
+import { getCrmTickets, getCrmTicketExternalStatus, createCrmTicket, updateCrmTicketEstado } from './crmApi'
+import type { CrmTicket, CreateCrmTicketInput, CrmEstado } from './types'
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import { apiGet } from '@/lib/api'
 
@@ -48,6 +48,16 @@ const TIPOS_TICKET_SOPORTE = [
   'OTRO',
 ] as const
 
+// Estados que un ADMIN/COORDINADOR puede fijar desde la web. Pasar a RESUELTO/CERRADO
+// hace que el backend avise a Grupo 11 para cerrar el ticket operacional (visitas).
+const ESTADO_OPTIONS: { value: CrmEstado; label: string }[] = [
+  { value: 'ABIERTO', label: 'Abierto' },
+  { value: 'EN_REVISION', label: 'En revisión' },
+  { value: 'RESUELTO', label: 'Resuelto' },
+  { value: 'CERRADO', label: 'Cerrado' },
+  { value: 'CANCELADO', label: 'Cancelado' },
+]
+
 const emptyForm: CreateCrmTicketInput = {
   tipo: 'CONSULTA_CLIENTE',
   titulo: '',
@@ -63,9 +73,12 @@ export default function CrmTicketsListPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateCrmTicketInput>(emptyForm)
   const [formError, setFormError] = useState('')
+  const [estadoError, setEstadoError] = useState('')
   const queryClient = useQueryClient()
   const session = useCurrentUser()
   const canCreate = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
+  // Mismos roles que permite el PATCH /incidentes-salud/:id en el backend.
+  const canManage = canCreate
 
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ['crmTickets'],
@@ -103,6 +116,29 @@ export default function CrmTicketsListPage() {
       setFormError(err instanceof Error ? err.message : 'No se pudo crear el ticket.')
     },
   })
+
+  // Cambio de estado con actualización optimista: se refleja al instante y se
+  // revierte si el backend falla. En éxito, el backend re-propaga a Grupo 11.
+  const updateEstadoMutation = useMutation({
+    mutationFn: ({ id, estado }: { id: string; estado: CrmEstado }) => updateCrmTicketEstado(id, estado),
+    onMutate: async ({ id, estado }) => {
+      setEstadoError('')
+      await queryClient.cancelQueries({ queryKey: ['crmTickets'] })
+      const prev = queryClient.getQueryData<CrmTicket[]>(['crmTickets'])
+      queryClient.setQueryData<CrmTicket[]>(['crmTickets'], (old) =>
+        old?.map((t) => (t.id === id ? { ...t, estado } : t)),
+      )
+      return { prev }
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['crmTickets'], ctx.prev)
+      setEstadoError(err instanceof Error ? err.message : 'No se pudo actualizar el estado.')
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['crmTickets'] }),
+  })
+
+  const isUpdatingRow = (id: string) =>
+    updateEstadoMutation.isPending && updateEstadoMutation.variables?.id === id
 
   const handleSubmit = () => {
     if (!form.titulo.trim()) {
@@ -147,6 +183,7 @@ export default function CrmTicketsListPage() {
     switch (estado) {
       case 'ABIERTO':
         return 'text-red-400 bg-red-400/10'
+      case 'EN_REVISION':
       case 'EN_PROGRESO':
         return 'text-yellow-400 bg-yellow-400/10'
       case 'RESUELTO':
@@ -176,6 +213,13 @@ export default function CrmTicketsListPage() {
           </button>
         )}
       </div>
+
+      {estadoError && (
+        <div className='mb-4 flex items-start gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-400'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          {estadoError}
+        </div>
+      )}
 
       <div className='overflow-hidden rounded-2xl border border-[#3C6E71]/40 bg-[#203C50] shadow-xl'>
         <div className='overflow-x-auto'>
@@ -225,10 +269,30 @@ export default function CrmTicketsListPage() {
                       </span>
                     </td>
                     <td className='px-6 py-4'>
-                      <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${getEstadoColor(ticket.estado)}`}>
-                        <div className={`size-1.5 rounded-full bg-current`} />
-                        {ticket.estado}
-                      </span>
+                      {canManage ? (
+                        <div className='flex items-center gap-2'>
+                          <select
+                            value={ticket.estado}
+                            onChange={(e) => updateEstadoMutation.mutate({ id: ticket.id, estado: e.target.value as CrmEstado })}
+                            disabled={isUpdatingRow(ticket.id)}
+                            className={`rounded-md border-0 px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#3C6E71] disabled:opacity-50 ${getEstadoColor(ticket.estado)}`}
+                          >
+                            {ESTADO_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value} className='bg-[#203C50] text-white'>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                          {isUpdatingRow(ticket.id) && (
+                            <div className='size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-white'></div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${getEstadoColor(ticket.estado)}`}>
+                          <div className={`size-1.5 rounded-full bg-current`} />
+                          {ticket.estado}
+                        </span>
+                      )}
                     </td>
                     <td className='px-6 py-4 text-right'>
                       {ticket.externalIncidentId ? (
