@@ -35,6 +35,7 @@ export interface InspeccionMantenimiento {
   pedidoExternoId?: string | null
   pedidoEstadoExterno?: string | null
   pedidoError?: string | null
+  incidenteId?: string | null
   intervencionAt?: string | null
   intervencionNotas?: string | null
   createdAt: string
