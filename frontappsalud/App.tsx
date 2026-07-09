@@ -306,7 +306,15 @@ function AppContent() {
         )}
 
       </VStack>
-      <ExpoStatusBar style="auto" />
+      {/* "auto" decide el color del ícono según Appearance (tema del SISTEMA:
+          claro/oscuro), no según el color real de fondo. El header azul
+          (theme.colors.yaleBlue) de ITINERARY/VISIT_DETAIL es un cuadro
+          redondeado más abajo, no llega hasta el status bar: ahí arriba
+          siempre se ve theme.colors.background (#F5F7FA, claro) en TODAS las
+          pantallas — confirmado con el color de píxel real. Si el sistema
+          está en modo oscuro, "auto" pone íconos claros ahí → invisibles.
+          Por eso se fuerza "dark" siempre, sin importar el tema del sistema. */}
+      <ExpoStatusBar style="dark" />
     </SafeAreaView>
   );
 }

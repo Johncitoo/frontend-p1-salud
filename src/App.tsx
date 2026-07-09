@@ -15,6 +15,7 @@ import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
 import CrmTicketsListPage from './features/crm/CrmTicketsListPage'
 import SeguimientoPage from './features/seguimiento/SeguimientoPage'
+import MedicamentosCatalogoPage from './features/medicamentos/MedicamentosCatalogoPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
 import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
@@ -170,6 +171,7 @@ function App() {
     if (pathname === '/audit') return <AuditPage />
     if (pathname === '/incidents') return <CrmTicketsListPage />
     if (pathname === '/seguimiento') return <SeguimientoPage />
+    if (pathname === '/medicamentos-catalogo') return <MedicamentosCatalogoPage />
 
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />

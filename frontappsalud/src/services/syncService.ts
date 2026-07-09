@@ -129,7 +129,13 @@ export const syncService = {
         headers: authHeaders(),
       });
       if (!responseVisitas.ok) throw new Error('Error al descargar visitas del servidor');
-      const filasVisitas: any[] = await responseVisitas.json();
+      // El endpoint /visitas/calendario devuelve todos los estados (lo necesita
+      // la agenda web para mostrar canceladas). Para el itinerario del
+      // profesional en terreno no tiene sentido bajar visitas canceladas: no son
+      // trabajo pendiente ni hecho, solo ensuciarían la lista.
+      const filasVisitas: any[] = (await responseVisitas.json()).filter(
+        (row: any) => row.estado !== 'CANCELADA',
+      );
       const apiVisitas: LocalVisita[] = filasVisitas.map(mapVisitaCalendario);
 
       // El nombre del profesional logueado viene gratis en cada fila del itinerario
