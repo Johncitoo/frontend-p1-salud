@@ -50,7 +50,7 @@ export interface CorregirInformeInput {
 }
 
 export interface CreateInspeccionInput {
-  pacienteId: string
+  pacienteId?: string
   visitaId?: string
   equipo: string
   diagnostico?: string
