@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CircleCheck, Pencil, Search, XCircle, Calendar as CalendarIcon, List, Link as LinkIcon, RefreshCcw } from 'lucide-react'
+import { CalendarDays, CircleCheck, Pencil, Search, XCircle, Calendar as CalendarIcon, List, Link as LinkIcon, RefreshCcw, Wrench, Plus, Trash2 } from 'lucide-react'
 
 import { useCurrentUser } from '@/features/auth/AuthSessionContext'
 import CalendarView, { CalendarVisitRow } from './CalendarView'
@@ -219,7 +219,7 @@ const SearchableSelect = ({ label, value, placeholder, emptyLabel, options, onCh
 const AgendaPage = () => {
   const session = useCurrentUser()
   const canWrite = session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
-  const canChangeState = canWrite || session.rol === 'PROFESIONAL'
+  const canChangeState = canWrite || session.rol === 'PROFESIONAL' || session.rol === 'TECNICO'
   const [visits, setVisits] = useState<VisitRow[]>([])
   const [patients, setPatients] = useState<PatientRow[]>([])
   const [professionals, setProfessionals] = useState<ProfessionalRow[]>([])
@@ -241,6 +241,15 @@ const AgendaPage = () => {
   const [motivoTexto, setMotivoTexto] = useState('')
   const [reprogFecha, setReprogFecha] = useState('')
   const [reprogHora, setReprogHora] = useState('')
+
+  // Paso 9 del UAT: inspección de mantenimiento (diagnóstico + repuestos a
+  // reemplazar). Dispara el pedido de repuestos automáticamente en el backend.
+  const [inspeccionModal, setInspeccionModal] = useState<{ visit: VisitRow } | null>(null)
+  const [inspeccionDiagnostico, setInspeccionDiagnostico] = useState('')
+  const [inspeccionRepuestos, setInspeccionRepuestos] = useState<{ nombre: string; cantidad: number }[]>([
+    { nombre: '', cantidad: 1 },
+  ])
+  const [isInspeccionSaving, setIsInspeccionSaving] = useState(false)
 
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('CALENDAR')
   const [calendarVisits, setCalendarVisits] = useState<CalendarVisitRow[]>([])
@@ -510,6 +519,59 @@ const AgendaPage = () => {
     }
   }
 
+  const handleInspeccion = (visit: VisitRow) => {
+    setError('')
+    setSuccessMsg('')
+    setInspeccionDiagnostico('')
+    setInspeccionRepuestos([{ nombre: '', cantidad: 1 }])
+    setInspeccionModal({ visit })
+  }
+
+  const updateRepuesto = (index: number, patch: Partial<{ nombre: string; cantidad: number }>) => {
+    setInspeccionRepuestos(prev => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+
+  const addRepuesto = () => setInspeccionRepuestos(prev => [...prev, { nombre: '', cantidad: 1 }])
+
+  const removeRepuesto = (index: number) =>
+    setInspeccionRepuestos(prev => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
+
+  const handleConfirmInspeccion = async () => {
+    if (!inspeccionModal) return
+    const { visit } = inspeccionModal
+
+    const diagnostico = inspeccionDiagnostico.trim()
+    const repuestos = inspeccionRepuestos
+      .map(r => ({ nombre: r.nombre.trim(), cantidad: Number(r.cantidad) }))
+      .filter(r => r.nombre.length > 0 && r.cantidad > 0)
+
+    if (!diagnostico) {
+      setError('Registra el diagnóstico de la inspección.')
+      return
+    }
+    if (repuestos.length === 0) {
+      setError('Agrega al menos un repuesto a reemplazar.')
+      return
+    }
+
+    setIsInspeccionSaving(true)
+    setError('')
+    setSuccessMsg('')
+    try {
+      await apiPost<unknown, { diagnostico: string; repuestos: { nombre: string; cantidad: number }[] }>(
+        `/visitas/${visit.id}/inspeccion-mantenimiento`,
+        { diagnostico, repuestos },
+      )
+      setSuccessMsg('Inspección registrada. Se generó automáticamente el pedido de repuestos.')
+      setInspeccionModal(null)
+      loadData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No fue posible registrar la inspección.')
+    } finally {
+      setIsInspeccionSaving(false)
+    }
+  }
+
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-8'>
       <section className='mx-auto w-full max-w-7xl space-y-6'>
@@ -668,6 +730,11 @@ const AgendaPage = () => {
                           {canChangeState && visit.estado === 'PROGRAMADA' ? (
                             <button onClick={() => handleChangeState(visit, 'EN_ATENCION')} className='inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50'>
                               <CalendarDays className='size-3' /> Iniciar
+                            </button>
+                          ) : null}
+                          {canChangeState && ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION'].includes(visit.estado) ? (
+                            <button onClick={() => handleInspeccion(visit)} className='inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50'>
+                              <Wrench className='size-3' /> Inspección
                             </button>
                           ) : null}
                           {canChangeState && visit.estado === 'EN_ATENCION' ? (
@@ -876,6 +943,79 @@ const AgendaPage = () => {
               onClick={handleConfirmMotivo}
             >
               {motivoModal?.accion === 'cancelar' ? 'Cancelar visita' : 'Confirmar reprogramación'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inspeccionModal !== null} onOpenChange={(open) => { if (!open) setInspeccionModal(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Inspección de mantenimiento</DialogTitle>
+            <DialogDescription>
+              Registra el diagnóstico del equipo y los repuestos a reemplazar. Al guardar se genera
+              automáticamente el pedido de repuestos y se notifica a los sistemas de logística e indicadores.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4'>
+            <div>
+              <label className='text-xs font-semibold text-slate-600'>Diagnóstico / informe técnico</label>
+              <Textarea
+                autoFocus
+                rows={3}
+                placeholder='Ej: Filtro HEPA desgastado y batería de respaldo con baja capacidad.'
+                value={inspeccionDiagnostico}
+                onChange={(e) => setInspeccionDiagnostico(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <div className='mb-2 flex items-center justify-between'>
+                <label className='text-xs font-semibold text-slate-600'>Repuestos a reemplazar</label>
+                <button
+                  type='button'
+                  onClick={addRepuesto}
+                  className='inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100'
+                >
+                  <Plus className='size-3' /> Agregar
+                </button>
+              </div>
+              <div className='space-y-2'>
+                {inspeccionRepuestos.map((repuesto, index) => (
+                  <div key={index} className='flex items-center gap-2'>
+                    <input
+                      type='text'
+                      placeholder='Nombre del repuesto (ej: Filtro HEPA)'
+                      value={repuesto.nombre}
+                      onChange={(e) => updateRepuesto(index, { nombre: e.target.value })}
+                      className='h-10 flex-1 rounded-lg border border-slate-300 px-3 text-sm'
+                    />
+                    <input
+                      type='number'
+                      min={1}
+                      value={repuesto.cantidad}
+                      onChange={(e) => updateRepuesto(index, { cantidad: Number(e.target.value) })}
+                      className='h-10 w-20 rounded-lg border border-slate-300 px-3 text-sm'
+                    />
+                    <button
+                      type='button'
+                      onClick={() => removeRepuesto(index)}
+                      disabled={inspeccionRepuestos.length === 1}
+                      className='inline-flex size-10 items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40'
+                    >
+                      <Trash2 className='size-4' />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setInspeccionModal(null)}>Volver</Button>
+            <Button onClick={handleConfirmInspeccion} disabled={isInspeccionSaving}>
+              {isInspeccionSaving ? 'Registrando…' : 'Registrar inspección'}
             </Button>
           </DialogFooter>
         </DialogContent>

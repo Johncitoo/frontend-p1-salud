@@ -28,15 +28,15 @@ type SidebarItem = {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { label: 'Panel', href: '/dashboard', icon: <Layers className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Pacientes', href: '/patients', icon: <Users className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL'] },
-  { label: 'Agenda', href: '/agenda', icon: <CalendarDays className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Panel', href: '/dashboard', icon: <Layers className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
+  { label: 'Pacientes', href: '/patients', icon: <Users className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
+  { label: 'Registrar paciente', href: '/patients/new', icon: <ClipboardList className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO'] },
+  { label: 'Agenda', href: '/agenda', icon: <CalendarDays className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
   { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
-  { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'PROFESIONAL', 'SUPERVISOR'] },
-  { label: 'Pacientes de Seguimiento', href: '/seguimiento', icon: <CalendarClock className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
+  { label: 'Pacientes de Seguimiento', href: '/seguimiento', icon: <CalendarClock className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
   { label: 'Catálogo de Medicamentos', href: '/medicamentos-catalogo', icon: <Pill className='size-5' />, roles: ['ADMIN', 'COORDINADOR'] },
   { label: 'Incidentes', href: '/incidents', icon: <AlertTriangle className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Mantenimiento', href: '/mantenimiento', icon: <Wrench className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },

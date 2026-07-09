@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, BriefcaseMedical, ClipboardCheck, Shield, UserRoundCog } from 'lucide-react'
+import { ArrowRight, BriefcaseMedical, ClipboardCheck, Shield, UserRoundCog, Wrench } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { loginWithMockRole, mockUsers, type MockRole } from '@/features/auth/mockAuth'
@@ -8,11 +8,12 @@ type LoginFormProps = {
   onAuthenticated: () => void
 }
 
-const roleIcons = {
+const roleIcons: Record<MockRole, typeof ClipboardCheck> = {
   COORDINADOR: ClipboardCheck,
   PROFESIONAL: BriefcaseMedical,
   SUPERVISOR: Shield,
   ADMIN: UserRoundCog,
+  TECNICO: Wrench,
 }
 
 const LoginForm = ({ onAuthenticated }: LoginFormProps) => {

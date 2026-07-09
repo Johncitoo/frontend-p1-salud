@@ -10,7 +10,7 @@ import {
 } from './keycloak'
 import { fetchCurrentUser, type CurrentUserProfile } from '@/lib/api'
 
-export type AppRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR'
+export type AppRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR' | 'TECNICO'
 
 type AuthStatus = 'loading' | 'authenticated' | 'access-denied' | 'error'
 
