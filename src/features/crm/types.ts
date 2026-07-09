@@ -1,5 +1,7 @@
 export type CrmSeveridad = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRÍTICA' | 'CRITICA'
-export type CrmEstado = 'ABIERTO' | 'EN_PROGRESO' | 'RESUELTO' | 'CERRADO' | 'CANCELADO'
+// Estados que maneja el backend (incidentes_salud). Cambiar a RESUELTO/CERRADO
+// dispara el re-envío a Grupo 11 para cerrar el ticket operacional.
+export type CrmEstado = 'ABIERTO' | 'EN_REVISION' | 'RESUELTO' | 'CERRADO' | 'CANCELADO'
 
 export interface CrmTicket {
   id: string
