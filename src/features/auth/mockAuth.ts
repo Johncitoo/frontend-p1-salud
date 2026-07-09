@@ -1,6 +1,6 @@
 import type { CurrentUserProfile } from '@/lib/api'
 
-export type MockRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR'
+export type MockRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR' | 'TECNICO'
 
 export type MockUserOption = {
   role: MockRole
@@ -23,6 +23,12 @@ export const mockUsers: MockUserOption[] = [
     label: 'Profesional',
     description: 'Consulta pacientes, zonas y datos asignados.',
     identityUserId: 'mock-profesional',
+  },
+  {
+    role: 'TECNICO',
+    label: 'Técnico',
+    description: 'Realiza visitas técnicas, registra inspecciones y reemplazos de componentes.',
+    identityUserId: 'mock-tecnico',
   },
   {
     role: 'SUPERVISOR',

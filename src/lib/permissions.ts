@@ -9,15 +9,15 @@ export const canAccessPath = (role: AppRole, pathname: string) => {
   if (pathname === '/professional') return role === 'PROFESIONAL'
 
   if (pathname === '/patients') return true
-  if (pathname === '/patients/new') return role === 'COORDINADOR' || role === 'PROFESIONAL'
+  if (pathname === '/patients/new') return role === 'COORDINADOR' || role === 'PROFESIONAL' || role === 'TECNICO'
   if (pathname === '/agenda' || pathname === '/visitas') return true
 
   if (pathname === '/fichas-clinicas') return true
-  if (pathname === '/fichas-clinicas/llenar') return role === 'COORDINADOR' || role === 'PROFESIONAL'
+  if (pathname === '/fichas-clinicas/llenar') return role === 'COORDINADOR' || role === 'PROFESIONAL' || role === 'TECNICO'
   if (pathname === '/fichas-clinicas/new') return role === 'COORDINADOR'
   if (/^\/fichas-clinicas\/plantillas\/[^/]+\/editar$/.test(pathname)) return role === 'COORDINADOR'
   if (/^\/fichas-clinicas\/plantillas\/[^/]+$/.test(pathname)) return true
-  if (/^\/fichas-clinicas\/[^/]+\/editar$/.test(pathname)) return role === 'COORDINADOR' || role === 'PROFESIONAL'
+  if (/^\/fichas-clinicas\/[^/]+\/editar$/.test(pathname)) return role === 'COORDINADOR' || role === 'PROFESIONAL' || role === 'TECNICO'
   if (/^\/fichas-clinicas\/[^/]+$/.test(pathname)) return true
 
   if (pathname === '/professionals') return role === 'COORDINADOR' || role === 'SUPERVISOR'
@@ -29,7 +29,7 @@ export const canAccessPath = (role: AppRole, pathname: string) => {
   if (pathname === '/users') return role === 'SUPERVISOR'
   if (pathname === '/audit') return role === 'SUPERVISOR'
 
-  if (pathname === '/seguimiento') return role === 'COORDINADOR' || role === 'PROFESIONAL' || role === 'SUPERVISOR'
+  if (pathname === '/seguimiento') return role === 'COORDINADOR' || role === 'PROFESIONAL' || role === 'SUPERVISOR' || role === 'TECNICO'
 
   if (pathname === '/medicamentos-catalogo') return role === 'COORDINADOR'
 

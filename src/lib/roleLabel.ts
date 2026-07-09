@@ -1,4 +1,4 @@
-export type AppRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR'
+export type AppRole = 'ADMIN' | 'COORDINADOR' | 'PROFESIONAL' | 'SUPERVISOR' | 'TECNICO'
 
 /**
  * Traduce un rol interno (ADMIN, COORDINADOR, ...) a su nombre en español.
@@ -9,6 +9,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   COORDINADOR: 'Coordinador',
   PROFESIONAL: 'Profesional',
   SUPERVISOR: 'Supervisor',
+  TECNICO: 'Técnico',
 }
 
 export function roleLabel(nombre: string): string {
