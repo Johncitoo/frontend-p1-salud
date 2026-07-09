@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, ClipboardCheck, FileText, PackageCheck, Pencil, Plus, RefreshCw, Wrench, X } from 'lucide-react'
 import { getRepuestosCatalogo, getInspecciones, createInspeccion, reintentarPedido, finalizarIntervencion, corregirInforme } from './mantenimientoApi'
@@ -53,6 +53,8 @@ const estadoBadge = (estado: string) => {
 export default function MantenimientoPage() {
   const [isOpen, setIsOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [visitaSearch, setVisitaSearch] = useState('')
+  const [isVisitaListOpen, setIsVisitaListOpen] = useState(false)
   // sku -> cantidad de los repuestos marcados.
   const [repuestosSel, setRepuestosSel] = useState<Record<string, number>>({})
   const [formError, setFormError] = useState('')
@@ -91,7 +93,23 @@ export default function MantenimientoPage() {
     enabled: isOpen,
   })
 
-  const pacienteById = new Map(pacientes.map((p) => [p.id, p]))
+  const pacienteById = useMemo(() => new Map(pacientes.map((p) => [p.id, p])), [pacientes])
+  const visitasOptions = useMemo(() => visitas.map((visita) => {
+    const paciente = pacienteById.get(visita.pacienteId)
+    const pacienteLabel = paciente ? `${paciente.nombres} ${paciente.apellidos}` : visita.pacienteId
+    const fecha = new Date(`${visita.fechaProgramada}T${visita.horaProgramada}`).toLocaleString('es-CL')
+    const label = `${fecha} - ${pacienteLabel} - ${visita.estado}`
+    return {
+      visita,
+      label,
+      helper: visita.prioridad ? `Prioridad ${visita.prioridad}` : undefined,
+      searchText: `${label} ${visita.prioridad ?? ''}`.toLowerCase(),
+    }
+  }), [pacienteById, visitas])
+  const selectedVisitaOption = visitasOptions.find((option) => option.visita.id === form.visitaId)
+  const filteredVisitasOptions = visitaSearch.trim()
+    ? visitasOptions.filter((option) => option.searchText.includes(visitaSearch.trim().toLowerCase())).slice(0, 30)
+    : visitasOptions.slice(0, 30)
 
   const createMutation = useMutation({
     mutationFn: createInspeccion,
@@ -191,7 +209,7 @@ export default function MantenimientoPage() {
         </div>
         {canRegistrar && (
           <button
-            onClick={() => { setForm(emptyForm); setRepuestosSel({}); setFormError(''); setIsOpen(true) }}
+            onClick={() => { setForm(emptyForm); setVisitaSearch(''); setIsVisitaListOpen(false); setRepuestosSel({}); setFormError(''); setIsOpen(true) }}
             className='inline-flex items-center gap-2 rounded-xl bg-[#3C6E71] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2A4D4F]'
           >
             <Plus className='size-4' />
@@ -346,22 +364,49 @@ export default function MantenimientoPage() {
             <div className='mt-4 space-y-4'>
               <div>
                 <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Cita de mantenimiento *</label>
-                <select
-                  value={form.visitaId}
-                  onChange={(e) => setForm((f) => ({ ...f, visitaId: e.target.value }))}
-                  className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
-                >
-                  <option value=''>Selecciona una cita</option>
-                  {visitas.map((v) => {
-                    const paciente = pacienteById.get(v.pacienteId)
-                    const pacienteLabel = paciente ? `${paciente.nombres} ${paciente.apellidos}` : v.pacienteId
-                    return (
-                      <option key={v.id} value={v.id}>
-                        {new Date(`${v.fechaProgramada}T${v.horaProgramada}`).toLocaleString('es-CL')} — {pacienteLabel} — {v.estado}
-                      </option>
-                    )
-                  })}
-                </select>
+                <div className='relative mt-1'>
+                  <input
+                    value={isVisitaListOpen ? visitaSearch : selectedVisitaOption?.label ?? visitaSearch}
+                    onChange={(e) => {
+                      setVisitaSearch(e.target.value)
+                      setForm((f) => ({ ...f, visitaId: '' }))
+                      setIsVisitaListOpen(true)
+                    }}
+                    onFocus={() => {
+                      setVisitaSearch(selectedVisitaOption?.label ?? visitaSearch)
+                      setIsVisitaListOpen(true)
+                    }}
+                    onBlur={() => window.setTimeout(() => setIsVisitaListOpen(false), 120)}
+                    placeholder='Buscar por fecha, paciente o estado'
+                    className='w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white placeholder:text-[#6B8A8C] focus:border-[#3C6E71] focus:outline-none'
+                    autoComplete='off'
+                  />
+                  {isVisitaListOpen && (
+                    <div className='absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[#3C6E71]/50 bg-[#102637] p-1 shadow-2xl'>
+                      {filteredVisitasOptions.map((option) => (
+                        <button
+                          key={option.visita.id}
+                          type='button'
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setForm((f) => ({ ...f, visitaId: option.visita.id }))
+                            setVisitaSearch(option.label)
+                            setIsVisitaListOpen(false)
+                          }}
+                          className={`block w-full rounded-md px-3 py-2 text-left text-sm transition hover:bg-[#3C6E71]/35 ${
+                            form.visitaId === option.visita.id ? 'bg-[#3C6E71]/45' : ''
+                          }`}
+                        >
+                          <span className='block font-semibold text-white'>{option.label}</span>
+                          {option.helper && <span className='mt-0.5 block text-xs text-[#9CBFC1]'>{option.helper}</span>}
+                        </button>
+                      ))}
+                      {filteredVisitasOptions.length === 0 && (
+                        <p className='px-3 py-3 text-sm text-[#9CBFC1]'>Sin citas para esa búsqueda.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <p className='mt-1 text-xs text-[#6B8A8C]'>Proyecto 3 usará el paciente y la dirección asociados a esta cita.</p>
               </div>
 
