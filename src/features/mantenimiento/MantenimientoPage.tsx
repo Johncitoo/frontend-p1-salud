@@ -13,6 +13,16 @@ type PacienteOption = {
   rut: string
 }
 
+type VisitaOption = {
+  id: string
+  pacienteId: string
+  fechaProgramada: string
+  horaProgramada: string
+  estado: string
+  prioridad: string
+  direccionPacienteId?: string | null
+}
+
 const PRIORIDADES: { value: CreateInspeccionInput['prioridad']; label: string }[] = [
   { value: 'baja', label: 'Baja' },
   { value: 'media', label: 'Media' },
@@ -21,7 +31,7 @@ const PRIORIDADES: { value: CreateInspeccionInput['prioridad']; label: string }[
 ]
 
 const emptyForm = {
-  pacienteId: '',
+  visitaId: '',
   equipo: '',
   prioridad: 'media' as CreateInspeccionInput['prioridad'],
   diagnostico: '',
@@ -74,6 +84,14 @@ export default function MantenimientoPage() {
     queryFn: () => apiGet<PacienteOption[]>('/pacientes'),
     enabled: isOpen,
   })
+
+  const { data: visitas = [] } = useQuery({
+    queryKey: ['visitasMantenimientoOptions'],
+    queryFn: () => apiGet<VisitaOption[]>('/visitas'),
+    enabled: isOpen,
+  })
+
+  const pacienteById = new Map(pacientes.map((p) => [p.id, p]))
 
   const createMutation = useMutation({
     mutationFn: createInspeccion,
@@ -145,12 +163,12 @@ export default function MantenimientoPage() {
 
   const handleSubmit = () => {
     const repuestos = Object.entries(repuestosSel).map(([sku, cantidad]) => ({ sku, cantidad }))
-    if (!form.pacienteId) return setFormError('Selecciona el paciente/cliente.')
+    if (!form.visitaId) return setFormError('Selecciona la cita de mantenimiento.')
     if (!form.equipo.trim()) return setFormError('Indica el equipo inspeccionado.')
     if (repuestos.length === 0) return setFormError('Marca al menos un repuesto requerido.')
     setFormError('')
     createMutation.mutate({
-      pacienteId: form.pacienteId,
+      visitaId: form.visitaId,
       equipo: form.equipo.trim(),
       prioridad: form.prioridad,
       diagnostico: form.diagnostico.trim() || undefined,
@@ -327,18 +345,24 @@ export default function MantenimientoPage() {
 
             <div className='mt-4 space-y-4'>
               <div>
-                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Paciente / cliente *</label>
+                <label className='text-xs font-semibold uppercase tracking-wider text-[#9CBFC1]'>Cita de mantenimiento *</label>
                 <select
-                  value={form.pacienteId}
-                  onChange={(e) => setForm((f) => ({ ...f, pacienteId: e.target.value }))}
+                  value={form.visitaId}
+                  onChange={(e) => setForm((f) => ({ ...f, visitaId: e.target.value }))}
                   className='mt-1 w-full rounded-lg border border-[#3C6E71]/40 bg-[#203C50] px-3 py-2 text-sm text-white focus:border-[#3C6E71] focus:outline-none'
                 >
-                  <option value=''>Selecciona un paciente</option>
-                  {pacientes.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} — {p.rut}</option>
-                  ))}
+                  <option value=''>Selecciona una cita</option>
+                  {visitas.map((v) => {
+                    const paciente = pacienteById.get(v.pacienteId)
+                    const pacienteLabel = paciente ? `${paciente.nombres} ${paciente.apellidos}` : v.pacienteId
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {new Date(`${v.fechaProgramada}T${v.horaProgramada}`).toLocaleString('es-CL')} — {pacienteLabel} — {v.estado}
+                      </option>
+                    )
+                  })}
                 </select>
-                <p className='mt-1 text-xs text-[#6B8A8C]'>Proyecto 3 usa su email como identificador y su dirección para el despacho.</p>
+                <p className='mt-1 text-xs text-[#6B8A8C]'>Proyecto 3 usará el paciente y la dirección asociados a esta cita.</p>
               </div>
 
               <div className='grid grid-cols-2 gap-4'>
