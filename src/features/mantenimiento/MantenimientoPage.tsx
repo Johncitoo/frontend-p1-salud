@@ -247,6 +247,11 @@ export default function MantenimientoPage() {
                         {insp.pedidoError && (
                           <p className='mt-1 max-w-xs text-xs text-red-400'>{insp.pedidoError}</p>
                         )}
+                        {insp.incidenteId && (
+                          <p className='mt-1 inline-flex items-center gap-1 text-xs text-[#9CBFC1]'>
+                            <FileText className='size-3' /> Ticket CRM + Incidente generado
+                          </p>
+                        )}
                       </td>
                       <td className='px-6 py-4 text-right'>
                         <div className='flex items-center justify-end gap-2'>
