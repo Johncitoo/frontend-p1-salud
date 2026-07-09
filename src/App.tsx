@@ -15,6 +15,7 @@ import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
 import CrmTicketsListPage from './features/crm/CrmTicketsListPage'
 import SeguimientoPage from './features/seguimiento/SeguimientoPage'
+import MedicamentosCatalogoPage from './features/medicamentos/MedicamentosCatalogoPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
 import FichaClinicaFormPage from './features/ficha-clinica/FichaClinicaFormPage'
 import PlantillaFichaBuilderPage from './features/ficha-clinica/PlantillaFichaBuilderPage'
@@ -34,7 +35,7 @@ const FullPageMessage = ({
 }) => (
   <main className='grid min-h-screen place-items-center bg-[#182F3F] px-6 text-white'>
     <section className='w-full max-w-md rounded-3xl border border-[#3C6E71]/50 bg-[#203C50] p-8 text-center shadow-xl shadow-black/20'>
-      <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#9CBFC1]'>Salud en Casa</p>
+      <p className='text-xs font-bold uppercase tracking-[0.2em] text-[#9CBFC1]'>MediHome</p>
       <h1 className='mt-3 text-2xl font-semibold text-white'>{title}</h1>
       <p className='mt-3 text-sm leading-6 text-[#D9D9D9]'>{message}</p>
       {action ? <div className='mt-6'>{action}</div> : null}
@@ -170,6 +171,7 @@ function App() {
     if (pathname === '/audit') return <AuditPage />
     if (pathname === '/incidents') return <CrmTicketsListPage />
     if (pathname === '/seguimiento') return <SeguimientoPage />
+    if (pathname === '/medicamentos-catalogo') return <MedicamentosCatalogoPage />
 
     // Fichas clínicas
     if (pathname === '/fichas-clinicas') return <FichaClinicaListPage />

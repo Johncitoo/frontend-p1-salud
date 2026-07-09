@@ -152,10 +152,11 @@ const SignosVitalesIotPanel = ({ pacienteId, campos, fields, onFill, isClosed = 
                 <button
                   type='button'
                   onClick={() => onFill(m.codigoCampo, m.valor)}
-                  disabled={isClosed}
+                  disabled={isClosed || !m.isEmpty}
+                  title={!m.isEmpty ? 'Este campo ya tiene un valor ingresado; no se sobrescribe con IoT.' : undefined}
                   className='inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#3C6E71]/40 px-2.5 py-1.5 text-xs font-semibold text-[#284B63] transition hover:bg-[#3C6E71]/10 disabled:cursor-not-allowed disabled:opacity-50'
                 >
-                  <Check className='size-3.5' /> Usar
+                  <Check className='size-3.5' /> {m.isEmpty ? 'Usar' : 'Ya tiene valor'}
                 </button>
               </div>
             ))}

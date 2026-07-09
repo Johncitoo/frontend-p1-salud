@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar'
-import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock, MapPin, Pencil, Phone, Stethoscope, UserRound, X } from 'lucide-react'
+import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, ClipboardPen, Clock, MapPin, Pencil, Phone, Stethoscope, UserRound, X } from 'lucide-react'
 import { format, getDay, parse, startOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -52,6 +52,8 @@ export type CalendarVisitRow = {
 type CalendarViewProps = {
   visits: CalendarVisitRow[]
   onSelectVisit?: (visit: CalendarVisitRow) => void
+  canEditVisit?: boolean
+  canFillFicha?: boolean
 }
 
 type CalendarEvent = {
@@ -132,7 +134,12 @@ const CalendarEventContent = ({ event }: { event: CalendarEvent }) => {
   )
 }
 
-export default function CalendarView({ visits, onSelectVisit }: CalendarViewProps) {
+export default function CalendarView({
+  visits,
+  onSelectVisit,
+  canEditVisit,
+  canFillFicha
+}: CalendarViewProps) {
   const [selectedVisit, setSelectedVisit] = useState<CalendarVisitRow | null>(null)
 
   const events = useMemo(() => {
@@ -614,7 +621,7 @@ export default function CalendarView({ visits, onSelectVisit }: CalendarViewProp
           padding: 14px 20px 18px;
         }
 
-        .agenda-visit-dialog-footer button {
+        .agenda-visit-dialog-footer button, .agenda-visit-dialog-footer a {
           display: inline-flex;
           height: 40px;
           align-items: center;
@@ -624,6 +631,7 @@ export default function CalendarView({ visits, onSelectVisit }: CalendarViewProp
           padding: 0 14px;
           font-size: 13px;
           font-weight: 800;
+          text-decoration: none;
         }
 
         .agenda-visit-edit-button {
@@ -634,6 +642,16 @@ export default function CalendarView({ visits, onSelectVisit }: CalendarViewProp
 
         .agenda-visit-edit-button:hover {
           background: #203C50;
+        }
+
+        .agenda-visit-ficha-button {
+          border: 1px solid #3C6E71;
+          background: #3C6E71;
+          color: #ffffff;
+        }
+
+        .agenda-visit-ficha-button:hover {
+          background: #2b5052;
         }
       `}</style>
       <Calendar
@@ -750,19 +768,30 @@ export default function CalendarView({ visits, onSelectVisit }: CalendarViewProp
               </div>
             </div>
 
-            {onSelectVisit ? (
-              <footer className='agenda-visit-dialog-footer'>
-                <button
-                  type='button'
-                  className='agenda-visit-edit-button'
-                  onClick={() => {
-                    onSelectVisit(selectedVisit)
-                    setSelectedVisit(null)
-                  }}
-                >
-                  <Pencil className='size-4' />
-                  Editar visita
-                </button>
+            {canEditVisit || canFillFicha ? (
+              <footer className='agenda-visit-dialog-footer flex gap-2 justify-end'>
+                {canFillFicha && (
+                  <a
+                    href={`/fichas-clinicas/llenar?visitaId=${selectedVisit.id}`}
+                    className='agenda-visit-ficha-button'
+                  >
+                    <ClipboardPen className='size-4' />
+                    Ficha Clínica
+                  </a>
+                )}
+                {canEditVisit && onSelectVisit && (
+                  <button
+                    type='button'
+                    className='agenda-visit-edit-button'
+                    onClick={() => {
+                      onSelectVisit(selectedVisit)
+                      setSelectedVisit(null)
+                    }}
+                  >
+                    <Pencil className='size-4' />
+                    Editar visita
+                  </button>
+                )}
               </footer>
             ) : null}
           </section>

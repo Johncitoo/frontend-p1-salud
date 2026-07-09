@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import {
   ArrowLeft,
   BriefcaseMedical,
+  ChevronDown,
   Pencil,
   Plus,
   Save,
@@ -76,6 +77,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
   // estado general
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([])
+  const [allUsers, setAllUsers] = useState<AvailableUser[]>([])
   const [specialties, setSpecialties] = useState<Specialty[]>([])
   const [zones, setZones] = useState<ZoneRow[]>([])
   const [error, setError] = useState('')
@@ -84,6 +86,12 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
   // búsqueda
   const [searchQuery, setSearchQuery] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
+  const [profesionSearch, setProfesionSearch] = useState('')
+  const [isProfesionDropdownOpen, setIsProfesionDropdownOpen] = useState(false)
+  const [zonaSearch, setZonaSearch] = useState('')
+  const [isZonaDropdownOpen, setIsZonaDropdownOpen] = useState(false)
 
   // formulario crear profesional
   const [profForm, setProfForm] = useState<ProfessionalForm>(emptyProfessionalForm)
@@ -114,12 +122,14 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
         : Promise.resolve([] as AvailableUser[]),
       apiGet<Specialty[]>('/profesionales/especialidades'),
       apiGet<ZoneRow[]>('/zonas'),
+      apiGet<AvailableUser[]>('/usuarios'),
     ])
-      .then(([profs, users, specs, zns]) => {
+      .then(([profs, users, specs, zns, allUsrs]) => {
         setProfessionals(profs)
         setAvailableUsers(users)
         setSpecialties(specs)
         setZones(zns)
+        setAllUsers(allUsrs)
 
         if (editId) {
           const prof = profs.find(p => p.id === editId)
@@ -299,10 +309,11 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
   // ---- filtrado ----
   const filteredProfessionals = searchQuery.trim()
-    ? professionals.filter(p =>
-        p.profesion.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.usuarioId.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? professionals.filter(p => {
+        const u = allUsers.find(user => user.id === p.usuarioId)
+        const nameMatches = u && `${u.nombres} ${u.apellidos} ${u.rut} ${u.email}`.toLowerCase().includes(searchQuery.toLowerCase())
+        return p.profesion.toLowerCase().includes(searchQuery.toLowerCase()) || nameMatches
+      })
     : professionals
 
   // ---- render ----
@@ -323,7 +334,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
           </p>
           <h1 className='m-0 text-3xl font-semibold text-slate-900'>Profesionales y especialidades</h1>
           <p className='mt-2 text-sm text-slate-600'>
-            CRUD completo de profesionales de salud, especialidades y asignación a zonas.
+            Administra el registro de profesionales de la salud, sus especialidades y zonas de atención.
           </p>
         </header>
 
@@ -349,25 +360,74 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                   <h2 className='text-lg font-semibold text-slate-900'>Registrar profesional</h2>
                 </div>
                 <p className='mb-4 text-sm text-slate-600'>
-                  Selecciona un usuario local con rol PROFESIONAL y completa sus datos clinicos.
+                  Selecciona un usuario local con rol PROFESIONAL y completa sus datos clínicos.
                 </p>
 
                 <div className='grid gap-4 lg:grid-cols-2'>
                   <label className='block'>
                     <span className='text-sm font-semibold text-slate-700'>Usuario profesional</span>
-                    <select
-                      value={profForm.usuarioId}
-                      onChange={e => setProfForm(p => ({ ...p, usuarioId: e.target.value }))}
-                      required
-                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                    >
-                      <option value=''>Selecciona un usuario</option>
-                      {availableUsers.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.nombres} {user.apellidos} - {user.email} ({user.rut})
-                        </option>
-                      ))}
-                    </select>
+                    <div className='relative mt-1'>
+                      <div 
+                        onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                        className='flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none hover:bg-slate-50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                        tabIndex={0}
+                      >
+                        <span className={profForm.usuarioId ? 'text-slate-900' : 'text-slate-500'}>
+                          {profForm.usuarioId 
+                            ? (() => {
+                                const u = availableUsers.find(x => x.id === profForm.usuarioId)
+                                return u ? `${u.nombres} ${u.apellidos} - ${u.email} (${u.rut})` : 'Seleccionado'
+                              })()
+                            : 'Selecciona un usuario'}
+                        </span>
+                        <ChevronDown className='size-4 text-slate-400' />
+                      </div>
+                      
+                      {isUserDropdownOpen && (
+                        <>
+                          <div 
+                            className='fixed inset-0 z-40' 
+                            onClick={() => setIsUserDropdownOpen(false)} 
+                          />
+                          <div className='absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg'>
+                            <div className='sticky top-0 bg-white p-2 border-b border-slate-100'>
+                              <div className='relative'>
+                                <Search className='absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
+                                <input
+                                  type='text'
+                                  autoFocus
+                                  placeholder='Buscar por nombre, RUT o email...'
+                                  value={userSearch}
+                                  onChange={e => setUserSearch(e.target.value)}
+                                  className='w-full rounded border border-slate-300 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                                />
+                              </div>
+                            </div>
+                            {availableUsers
+                              .filter(u => `${u.nombres} ${u.apellidos} ${u.rut} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase()))
+                              .map(user => (
+                                <div
+                                  key={user.id}
+                                  onClick={() => {
+                                    setProfForm(p => ({ ...p, usuarioId: user.id }))
+                                    setIsUserDropdownOpen(false)
+                                    setUserSearch('')
+                                  }}
+                                  className='cursor-pointer px-4 py-2 text-sm hover:bg-slate-50 hover:text-emerald-700'
+                                >
+                                  <div className='font-semibold'>{user.nombres} {user.apellidos}</div>
+                                  <div className='text-xs text-slate-500'>{user.email} · RUT: {user.rut}</div>
+                                </div>
+                              ))}
+                            {availableUsers.filter(u => `${u.nombres} ${u.apellidos} ${u.rut} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
+                              <div className='px-4 py-3 text-sm text-slate-500 text-center'>
+                                No se encontraron usuarios.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                     {availableUsers.length === 0 && (
                       <span className='mt-1 block text-xs text-amber-700'>
                         No hay usuarios con rol PROFESIONAL disponibles. Crea el usuario primero en Usuarios.
@@ -376,22 +436,67 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                   </label>
 
                   <label className='block'>
-                    <span className='text-sm font-semibold text-slate-700'>Profesion</span>
-                    <select
-                      value={profForm.profesion}
-                      onChange={e => setProfForm(p => ({ ...p, profesion: e.target.value }))}
-                      required
-                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                    >
-                      <option value=''>Seleccionar especialidad</option>
-                      {specialties.map(s => (
-                        <option key={s.id} value={s.nombre}>{s.nombre}</option>
-                      ))}
-                    </select>
+                    <span className='text-sm font-semibold text-slate-700'>Profesión</span>
+                    <div className='relative mt-1'>
+                      <div 
+                        onClick={() => setIsProfesionDropdownOpen(!isProfesionDropdownOpen)}
+                        className='flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none hover:bg-slate-50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                        tabIndex={0}
+                      >
+                        <span className={profForm.profesion ? 'text-slate-900' : 'text-slate-500'}>
+                          {profForm.profesion || 'Seleccionar especialidad'}
+                        </span>
+                        <ChevronDown className='size-4 text-slate-400' />
+                      </div>
+                      
+                      {isProfesionDropdownOpen && (
+                        <>
+                          <div 
+                            className='fixed inset-0 z-40' 
+                            onClick={() => setIsProfesionDropdownOpen(false)} 
+                          />
+                          <div className='absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg'>
+                            <div className='sticky top-0 bg-white p-2 border-b border-slate-100'>
+                              <div className='relative'>
+                                <Search className='absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
+                                <input
+                                  type='text'
+                                  autoFocus
+                                  placeholder='Buscar especialidad...'
+                                  value={profesionSearch}
+                                  onChange={e => setProfesionSearch(e.target.value)}
+                                  className='w-full rounded border border-slate-300 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                                />
+                              </div>
+                            </div>
+                            {specialties
+                              .filter(s => s.nombre.toLowerCase().includes(profesionSearch.toLowerCase()))
+                              .map(s => (
+                                <div
+                                  key={s.id}
+                                  onClick={() => {
+                                    setProfForm(p => ({ ...p, profesion: s.nombre }))
+                                    setIsProfesionDropdownOpen(false)
+                                    setProfesionSearch('')
+                                  }}
+                                  className='cursor-pointer px-4 py-2 text-sm hover:bg-slate-50 hover:text-emerald-700'
+                                >
+                                  {s.nombre}
+                                </div>
+                              ))}
+                            {specialties.filter(s => s.nombre.toLowerCase().includes(profesionSearch.toLowerCase())).length === 0 && (
+                              <div className='px-4 py-3 text-sm text-slate-500 text-center'>
+                                No se encontraron especialidades.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </label>
 
                   <label className='block'>
-                    <span className='text-sm font-semibold text-slate-700'>Numero de registro</span>
+                    <span className='text-sm font-semibold text-slate-700'>Número de registro</span>
                     <input
                       value={profForm.numeroRegistro}
                       onChange={e => setProfForm(p => ({ ...p, numeroRegistro: e.target.value }))}
@@ -402,20 +507,62 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
 
                   <label className='block'>
                     <span className='text-sm font-semibold text-slate-700'>Zonas de cobertura</span>
-                    <select
-                      value=''
-                      onChange={e => {
-                        if (e.target.value) toggleFormValue('zonaIds', e.target.value)
-                      }}
-                      className='mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
-                    >
-                      <option value=''>Agregar zona opcional</option>
-                      {zones.filter(z => z.activa && !profForm.zonaIds.includes(z.id)).map(zone => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.nombre} - {zone.comuna}
-                        </option>
-                      ))}
-                    </select>
+                    <div className='relative mt-1'>
+                      <div 
+                        onClick={() => setIsZonaDropdownOpen(!isZonaDropdownOpen)}
+                        className='flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none hover:bg-slate-50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                        tabIndex={0}
+                      >
+                        <span className='text-slate-500'>Agregar zona opcional</span>
+                        <ChevronDown className='size-4 text-slate-400' />
+                      </div>
+                      
+                      {isZonaDropdownOpen && (
+                        <>
+                          <div 
+                            className='fixed inset-0 z-40' 
+                            onClick={() => setIsZonaDropdownOpen(false)} 
+                          />
+                          <div className='absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg'>
+                            <div className='sticky top-0 bg-white p-2 border-b border-slate-100'>
+                              <div className='relative'>
+                                <Search className='absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
+                                <input
+                                  type='text'
+                                  autoFocus
+                                  placeholder='Buscar zona...'
+                                  value={zonaSearch}
+                                  onChange={e => setZonaSearch(e.target.value)}
+                                  className='w-full rounded border border-slate-300 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                                />
+                              </div>
+                            </div>
+                            {zones
+                              .filter(z => z.activa && !profForm.zonaIds.includes(z.id))
+                              .filter(z => `${z.nombre} ${z.comuna}`.toLowerCase().includes(zonaSearch.toLowerCase()))
+                              .map(zone => (
+                                <div
+                                  key={zone.id}
+                                  onClick={() => {
+                                    toggleFormValue('zonaIds', zone.id)
+                                    setIsZonaDropdownOpen(false)
+                                    setZonaSearch('')
+                                  }}
+                                  className='cursor-pointer px-4 py-2 text-sm hover:bg-slate-50 hover:text-emerald-700'
+                                >
+                                  <div className='font-semibold'>{zone.nombre}</div>
+                                  <div className='text-xs text-slate-500'>{zone.comuna}</div>
+                                </div>
+                              ))}
+                            {zones.filter(z => z.activa && !profForm.zonaIds.includes(z.id)).filter(z => `${z.nombre} ${z.comuna}`.toLowerCase().includes(zonaSearch.toLowerCase())).length === 0 && (
+                              <div className='px-4 py-3 text-sm text-slate-500 text-center'>
+                                No hay zonas disponibles para agregar.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </label>
                 </div>
 
@@ -426,23 +573,28 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                       {specialties.map(specialty => (
                         <label
                           key={specialty.id}
-                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                          className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
                             profForm.especialidadIds.includes(specialty.id)
-                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-                              : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                              ? 'border-[#3C6E71] bg-[#3C6E71] text-white shadow-sm'
+                              : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                         >
                           <input
                             type='checkbox'
                             checked={profForm.especialidadIds.includes(specialty.id)}
                             onChange={() => toggleFormValue('especialidadIds', specialty.id)}
-                            className='size-3.5 rounded border-slate-300 text-emerald-700'
+                            className='hidden'
                           />
+                          {profForm.especialidadIds.includes(specialty.id) && (
+                            <svg className='size-3.5 text-white' viewBox='0 0 20 20' fill='currentColor'>
+                              <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                            </svg>
+                          )}
                           {specialty.nombre}
                         </label>
                       ))}
                       {specialties.length === 0 && (
-                        <span className='text-xs text-slate-500'>No hay especialidades creadas todavia.</span>
+                        <span className='text-xs text-slate-500'>No hay especialidades creadas todavía.</span>
                       )}
                     </div>
                   </div>
@@ -465,7 +617,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                         )
                       })}
                       {profForm.zonaIds.length === 0 && (
-                        <span className='text-xs text-slate-500'>Puedes asignarlas ahora o despues desde el boton Asignar.</span>
+                        <span className='text-xs text-slate-500'>Puedes asignarlas ahora o después desde el botón Asignar.</span>
                       )}
                     </div>
                   </div>
@@ -564,8 +716,11 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                         ) : (
                           <>
                             <td className='px-5 py-3 font-medium text-slate-900'>{prof.profesion}</td>
-                            <td className='max-w-[200px] truncate px-5 py-3 font-mono text-xs text-slate-500'>
-                              {prof.usuarioId}
+                            <td className='max-w-[200px] truncate px-5 py-3 text-sm text-slate-700'>
+                              {(() => {
+                                const u = allUsers.find(user => user.id === prof.usuarioId)
+                                return u ? `${u.nombres} ${u.apellidos}` : prof.usuarioId
+                              })()}
                             </td>
                             <td className='px-5 py-3 text-slate-500'>{prof.numeroRegistro || '—'}</td>
                             <td className='px-5 py-3'>
@@ -584,7 +739,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                                 {canWrite && (
                                   <button
                                     onClick={() => startEditing(prof)}
-                                    className='inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+                                    className='inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-200 transition-colors'
                                   >
                                     <Pencil className='size-3' />
                                     Editar
@@ -593,7 +748,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                                 {canWrite && (
                                   <button
                                     onClick={() => setAssignProfId(assignProfId === prof.id ? null : prof.id)}
-                                    className='inline-flex items-center gap-1 rounded-md border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50'
+                                    className='inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100 transition-colors'
                                   >
                                     <UserCog className='size-3' />
                                     Asignar
@@ -602,7 +757,7 @@ const ProfessionalsPage = ({ editId }: ProfessionalsPageProps) => {
                                 {canDelete && (
                                   <button
                                     onClick={() => handleDeleteProfessional(prof)}
-                                    className='inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50'
+                                    className='inline-flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-red-600 transition-colors'
                                   >
                                     <Trash2 className='size-3' />
                                     Eliminar

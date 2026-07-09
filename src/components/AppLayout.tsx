@@ -9,6 +9,7 @@ import {
   Layers,
   LogOut,
   MapPin,
+  Pill,
   Stethoscope,
   UserCog,
   Users,
@@ -33,8 +34,9 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Usuarios', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { label: 'Profesionales', href: '/professionals', icon: <Stethoscope className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
-  { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Pacientes de Seguimiento', href: '/seguimiento', icon: <CalendarClock className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Catálogo de Medicamentos', href: '/medicamentos-catalogo', icon: <Pill className='size-5' />, roles: ['ADMIN', 'COORDINADOR'] },
   { label: 'Incidentes', href: '/incidents', icon: <AlertTriangle className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
@@ -63,16 +65,26 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       <aside className='border-b border-[#3C6E71]/60 bg-[#203C50] text-white shadow-xl shadow-black/20 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r'>
         <div className='flex items-center justify-between px-5 py-5 lg:block lg:px-6 lg:py-7'>
           <a href={homePath} className='flex items-center gap-3'>
-            <span className='grid size-11 place-items-center rounded-2xl bg-[#284B63] text-white shadow-md shadow-[#284B63]/15'>
-              <HeartPulse className='size-6' aria-hidden='true' />
+            <span className='grid size-11 place-items-center rounded-2xl bg-white shadow-md shadow-[#284B63]/15 overflow-hidden'>
+              <img src="/favicon.png" alt="MediHome Logo" className="size-full object-cover p-1" />
             </span>
             <span>
-              <span className='block text-[10px] font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Red asistencial</span>
-              <span className='block text-base font-semibold tracking-tight text-white'>Salud en Casa</span>
+              <span className='block text-[10px] font-bold uppercase tracking-[0.2em] text-[#3C6E71]'>Atención domiciliaria</span>
+              <span className='block text-base font-semibold tracking-tight text-white'>MediHome</span>
             </span>
           </a>
-          <div className='rounded-full bg-[#3C6E71] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white lg:mt-5 lg:inline-flex'>
-            {profile.rol}
+          
+          <div className='flex items-center gap-3 lg:mt-5'>
+            <div className='rounded-full bg-[#3C6E71] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white lg:inline-flex'>
+              {profile.rol}
+            </div>
+            <button
+              onClick={handleLogout}
+              title='Cerrar sesión'
+              className='grid size-8 place-items-center rounded-full bg-[#3C6E71]/20 text-white transition-colors hover:bg-[#3C6E71] lg:hidden'
+            >
+              <LogOut className='size-4' />
+            </button>
           </div>
         </div>
 

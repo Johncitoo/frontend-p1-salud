@@ -45,6 +45,36 @@ function clearPersistedSession(): void {
   SecureStore.deleteItemAsync(SESSION_STORAGE_KEY).catch(() => {});
 }
 
+// Renueva en silencio el access token de la sesión activa si ya venció o está
+// por vencer (usa el refresh token contra Keycloak). Se usa tanto al arrancar
+// la app (restoreSession) como periódicamente mientras queda abierta (ver
+// startTokenAutoRefresh en App.tsx): sin esto, una jornada de terreno de varias
+// horas hace que el access token expire a mitad de uso y el profesional
+// empiece a ver errores de sincronización sin haber hecho nada raro.
+async function refreshCurrentSessionIfNeeded(isOnline: boolean): Promise<boolean> {
+  if (!currentSession) return false;
+
+  const isExpiringSoon = Date.now() > currentSession.expiresAt - 60_000;
+  if (!isOnline || !isExpiringSoon) return true;
+  if (!currentSession.refreshToken) return true;
+
+  const issuer = requireIssuer();
+  const discovery = await AuthSession.fetchDiscoveryAsync(issuer);
+  const refreshed = await AuthSession.refreshAsync(
+    { clientId: KEYCLOAK_CLIENT_ID, refreshToken: currentSession.refreshToken },
+    discovery,
+  );
+
+  currentSession = {
+    accessToken: refreshed.accessToken,
+    refreshToken: refreshed.refreshToken ?? currentSession.refreshToken,
+    idToken: refreshed.idToken ?? currentSession.idToken,
+    expiresAt: Date.now() + (refreshed.expiresIn ?? 300) * 1000,
+  };
+  persistSession(currentSession);
+  return true;
+}
+
 // Restaura la sesión guardada (si existe) al arrancar la app, para no forzar un
 // login por red en cada apertura. Con conexión, si el access token ya venció (o
 // está por vencer) intenta renovarlo en silencio con el refresh token; si el
@@ -57,29 +87,8 @@ export async function restoreSession(isOnline: boolean): Promise<boolean> {
     const raw = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
     if (!raw) return false;
 
-    const stored: KeycloakSession = JSON.parse(raw);
-    currentSession = stored;
-
-    const isExpiringSoon = Date.now() > stored.expiresAt - 60_000;
-    if (!isOnline || !isExpiringSoon) return true;
-
-    if (!stored.refreshToken) return true;
-
-    const issuer = requireIssuer();
-    const discovery = await AuthSession.fetchDiscoveryAsync(issuer);
-    const refreshed = await AuthSession.refreshAsync(
-      { clientId: KEYCLOAK_CLIENT_ID, refreshToken: stored.refreshToken },
-      discovery,
-    );
-
-    currentSession = {
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken ?? stored.refreshToken,
-      idToken: refreshed.idToken ?? stored.idToken,
-      expiresAt: Date.now() + (refreshed.expiresIn ?? 300) * 1000,
-    };
-    persistSession(currentSession);
-    return true;
+    currentSession = JSON.parse(raw);
+    return await refreshCurrentSessionIfNeeded(isOnline);
   } catch (err) {
     // Token de refresco inválido/revocado, o Keycloak inalcanzable con el
     // access token ya vencido: no hay sesión utilizable, vuelve al login.
@@ -87,6 +96,19 @@ export async function restoreSession(isOnline: boolean): Promise<boolean> {
     currentSession = null;
     clearPersistedSession();
     return false;
+  }
+}
+
+// Refresca el token en silencio mientras la app sigue abierta, sin esperar a
+// que el usuario reinicie la app o a que un request falle con 401 (ver
+// startTokenAutoRefresh en App.tsx). Si el refresh falla (ej. red caída
+// momentáneamente), no descarta la sesión: se reintenta en el próximo tick.
+export async function refreshSessionIfNeeded(isOnline: boolean): Promise<void> {
+  if (!currentSession) return;
+  try {
+    await refreshCurrentSessionIfNeeded(isOnline);
+  } catch (err) {
+    console.error('No se pudo renovar el token de Keycloak en segundo plano:', err);
   }
 }
 
