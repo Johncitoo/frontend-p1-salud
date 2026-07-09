@@ -14,7 +14,7 @@ import { hydrateFromSnapshot } from './src/database/offlineDbPersistence';
 import { Calendar, Settings } from 'lucide-react-native';
 
 import { syncService, AUTH_MODE } from './src/services/syncService';
-import { restoreSession, hasKeycloakAccessRole, logoutFromKeycloak } from './src/services/keycloakAuth';
+import { restoreSession, refreshSessionIfNeeded, hasKeycloakAccessRole, logoutFromKeycloak } from './src/services/keycloakAuth';
 
 export default function App() {
   return (
@@ -125,11 +125,15 @@ function AppContent() {
       .finally(() => setDbReady(true));
   }, []);
 
-  // Inicializar base de datos local y descargar datos dinámicos
+  // Inicializar base de datos local y descargar datos dinámicos. Se frena
+  // mientras sigue en LOGIN: en modo Keycloak todavía no hay token en ese
+  // punto, y lanzar la sincronización antes de tiempo solo produce un error
+  // de "sesión no activa" cosmético apenas se abre la app.
   useEffect(() => {
     if (!dbReady) return;
+    if (currentScreen === 'LOGIN') return;
     handleDescargarDatos();
-  }, [isOnline, dbReady]);
+  }, [isOnline, dbReady, currentScreen]);
 
   useEffect(() => {
     if (!dbReady) return;
@@ -139,12 +143,21 @@ function AppContent() {
     return () => clearInterval(interval);
   }, [isOnline, dbReady]);
 
+  // Renueva el token de Keycloak en segundo plano mientras la app sigue
+  // abierta. Sin esto, una jornada larga de terreno hace que el access token
+  // expire a mitad de uso (dura pocos minutos) y las sincronizaciones
+  // empiecen a fallar con 401 hasta que el profesional cierre y reabra la app.
+  useEffect(() => {
+    if (AUTH_MODE !== 'keycloak') return;
+    if (!isOnline) return;
+    const interval = setInterval(() => refreshSessionIfNeeded(isOnline), 60000);
+    return () => clearInterval(interval);
+  }, [isOnline]);
+
   const handleLoginSuccess = () => {
+    // El cambio a 'ITINERARY' dispara el efecto de arriba, que ahora sí
+    // sincroniza porque ya no estamos en LOGIN.
     setCurrentScreen('ITINERARY');
-    // El intento automático de descarga en el arranque (línea arriba) ocurre antes
-    // del login, así que en modo Keycloak siempre falla por falta de token. Ahora
-    // que ya hay sesión, hay que reintentar para traer los datos reales.
-    handleDescargarDatos();
   };
 
   // Cierra la sesión de Keycloak (limpia memoria + SecureStore, ver

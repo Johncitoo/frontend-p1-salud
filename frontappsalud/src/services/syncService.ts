@@ -37,7 +37,15 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 }
 
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  // OJO: no usar toISOString() aquí, devuelve la fecha en UTC. Cerca de
+  // medianoche eso hace que "hoy" salte al día siguiente antes de tiempo
+  // según la zona horaria del dispositivo, y la app deja de mostrar
+  // visitas que sí son de hoy en hora local.
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dia = String(ahora.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
 }
 
 // Aplana la fila de GET /visitas/calendario (nombres de paciente sueltos, dirección
