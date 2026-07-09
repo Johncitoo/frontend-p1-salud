@@ -39,7 +39,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Pacientes de Seguimiento', href: '/seguimiento', icon: <CalendarClock className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
   { label: 'Catálogo de Medicamentos', href: '/medicamentos-catalogo', icon: <Pill className='size-5' />, roles: ['ADMIN', 'COORDINADOR'] },
   { label: 'Incidentes', href: '/incidents', icon: <AlertTriangle className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
-  { label: 'Mantenimiento', href: '/mantenimiento', icon: <Wrench className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Mantenimiento', href: '/mantenimiento', icon: <Wrench className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
