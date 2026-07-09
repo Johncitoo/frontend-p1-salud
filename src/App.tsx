@@ -14,6 +14,7 @@ import ProfessionalsPage from './features/professionals/ProfessionalsPage'
 import AgendaPage from './features/visits/AgendaPage'
 import AuditPage from './features/audit/AuditPage'
 import CrmTicketsListPage from './features/crm/CrmTicketsListPage'
+import MantenimientoPage from './features/mantenimiento/MantenimientoPage'
 import SeguimientoPage from './features/seguimiento/SeguimientoPage'
 import MedicamentosCatalogoPage from './features/medicamentos/MedicamentosCatalogoPage'
 import FichaClinicaListPage from './features/ficha-clinica/FichaClinicaListPage'
@@ -170,6 +171,7 @@ function App() {
 
     if (pathname === '/audit') return <AuditPage />
     if (pathname === '/incidents') return <CrmTicketsListPage />
+    if (pathname === '/mantenimiento') return <MantenimientoPage />
     if (pathname === '/seguimiento') return <SeguimientoPage />
     if (pathname === '/medicamentos-catalogo') return <MedicamentosCatalogoPage />
 
