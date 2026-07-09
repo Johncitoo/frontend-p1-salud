@@ -9,6 +9,7 @@ import {
   Layers,
   LogOut,
   MapPin,
+  Pill,
   Stethoscope,
   UserCog,
   Users,
@@ -35,6 +36,7 @@ const sidebarItems: SidebarItem[] = [
   { label: 'Zonas', href: '/zones', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Fichas Clínicas', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
   { label: 'Pacientes de Seguimiento', href: '/seguimiento', icon: <CalendarClock className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { label: 'Catálogo de Medicamentos', href: '/medicamentos-catalogo', icon: <Pill className='size-5' />, roles: ['ADMIN', 'COORDINADOR'] },
   { label: 'Incidentes', href: '/incidents', icon: <AlertTriangle className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'SUPERVISOR'] },
   { label: 'Auditoría', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]

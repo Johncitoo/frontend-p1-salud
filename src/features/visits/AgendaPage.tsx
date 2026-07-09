@@ -802,12 +802,12 @@ const AgendaPage = () => {
       </section>
 
       <Dialog open={motivoModal !== null} onOpenChange={(open) => { if (!open) setMotivoModal(null) }}>
-        <DialogContent>
+        <DialogContent className='border border-[#6f929b]/35 !bg-[#1c374a] text-white shadow-2xl shadow-black/40'>
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className='text-white'>
               {motivoModal?.accion === 'cancelar' ? 'Cancelar visita' : 'Reprogramar visita'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className='text-[#B7C4C5]'>
               {motivoModal?.accion === 'cancelar'
                 ? '¿Seguro que quieres cancelar esta visita? El motivo se incluye en el correo al paciente.'
                 : 'Indica la nueva fecha y hora de la visita. El paciente y el profesional recibirán un correo con el cambio.'}
@@ -816,21 +816,21 @@ const AgendaPage = () => {
           {motivoModal?.accion === 'reprogramar' ? (
             <div className='grid grid-cols-2 gap-3'>
               <div>
-                <label className='text-xs font-semibold text-slate-600'>Nueva fecha</label>
+                <label className='text-xs font-semibold text-[#D9D9D9]'>Nueva fecha</label>
                 <input
                   type='date'
                   value={reprogFecha}
                   onChange={(e) => setReprogFecha(e.target.value)}
-                  className='mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm'
+                  className='mt-1 h-10 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm text-white focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15'
                 />
               </div>
               <div>
-                <label className='text-xs font-semibold text-slate-600'>Nueva hora</label>
+                <label className='text-xs font-semibold text-[#D9D9D9]'>Nueva hora</label>
                 <input
                   type='time'
                   value={reprogHora}
                   onChange={(e) => setReprogHora(e.target.value)}
-                  className='mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm'
+                  className='mt-1 h-10 w-full rounded-lg border border-[#6f929b]/45 !bg-[#173344] px-3 text-sm text-white focus:border-[#9CBFC1] focus:!bg-[#142f3f] focus:outline-none focus:ring-2 focus:ring-[#9CBFC1]/15'
                 />
               </div>
             </div>
@@ -841,11 +841,22 @@ const AgendaPage = () => {
             placeholder='Motivo (opcional)'
             value={motivoTexto}
             onChange={(e) => setMotivoTexto(e.target.value)}
+            className='border-[#6f929b]/45 !bg-[#173344] text-white placeholder:text-[#9CBFC1] focus-visible:border-[#9CBFC1] focus-visible:ring-[#9CBFC1]/15'
           />
           <DialogFooter>
-            <Button variant='outline' onClick={() => setMotivoModal(null)}>Volver</Button>
             <Button
-              variant={motivoModal?.accion === 'cancelar' ? 'destructive' : 'default'}
+              variant='outline'
+              className='border-[#6f929b]/45 bg-transparent text-white hover:bg-white/10'
+              onClick={() => setMotivoModal(null)}
+            >
+              Volver
+            </Button>
+            <Button
+              className={
+                motivoModal?.accion === 'cancelar'
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-[#3C6E71] text-white hover:bg-[#355F62]'
+              }
               onClick={handleConfirmMotivo}
             >
               {motivoModal?.accion === 'cancelar' ? 'Cancelar visita' : 'Confirmar reprogramación'}

@@ -37,7 +37,15 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 }
 
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  // OJO: no usar toISOString() aquí, devuelve la fecha en UTC. Cerca de
+  // medianoche eso hace que "hoy" salte al día siguiente antes de tiempo
+  // según la zona horaria del dispositivo, y la app deja de mostrar
+  // visitas que sí son de hoy en hora local.
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dia = String(ahora.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
 }
 
 // Aplana la fila de GET /visitas/calendario (nombres de paciente sueltos, dirección
@@ -121,7 +129,13 @@ export const syncService = {
         headers: authHeaders(),
       });
       if (!responseVisitas.ok) throw new Error('Error al descargar visitas del servidor');
-      const filasVisitas: any[] = await responseVisitas.json();
+      // El endpoint /visitas/calendario devuelve todos los estados (lo necesita
+      // la agenda web para mostrar canceladas). Para el itinerario del
+      // profesional en terreno no tiene sentido bajar visitas canceladas: no son
+      // trabajo pendiente ni hecho, solo ensuciarían la lista.
+      const filasVisitas: any[] = (await responseVisitas.json()).filter(
+        (row: any) => row.estado !== 'CANCELADA',
+      );
       const apiVisitas: LocalVisita[] = filasVisitas.map(mapVisitaCalendario);
 
       // El nombre del profesional logueado viene gratis en cada fila del itinerario
