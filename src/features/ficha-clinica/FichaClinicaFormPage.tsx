@@ -16,12 +16,15 @@ import {
   fichaToFormValues,
   getEstadoBadgeClass,
   getInputType,
+  getOptionEntries,
   validateDynamicFields,
 } from './fichaFormUtils'
+import { FichaCampoArchivo } from './FichaCampoArchivo'
 import { clearDraft, readDraft, saveDraft } from './draftStorage'
 import FichaAdjuntosPanel from './FichaAdjuntosPanel'
 import DiagnosticoMedicamentosPanel from './DiagnosticoMedicamentosPanel'
 import SignosVitalesIotPanel from './SignosVitalesIotPanel'
+import { uploadDocumentoAdjunto } from './documentosAdjuntosApi'
 
 // ============================================================
 const fieldClassName =
@@ -181,8 +184,6 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setPlantillaFichaId(draft.value.plantillaFichaId)
           setFields(draft.value.fields)
           setObservaciones(draft.value.observaciones)
-          setCurrentVersion(draft.value.currentVersion)
-          setFichaEstado(draft.value.fichaEstado)
           setSuccessMsg(`Borrador local restaurado. Ultimo guardado: ${new Date(draft.savedAt).toLocaleString('es-CL')}.`)
         }
       } catch (err) {
@@ -276,12 +277,27 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
   }
 
   const handleRetryWithLatest = async () => {
-    if (!fichaId) return
+    if (!fichaId && !createdFichaId && !visitaId) return
     setConflictWarning(false)
     setError('')
 
     try {
-      const ficha = await apiGet<FichaClinicaRow>(`/fichas-clinicas/${fichaId}`)
+      let ficha: FichaClinicaRow | undefined
+      
+      if (fichaId || createdFichaId) {
+        ficha = await apiGet<FichaClinicaRow>(`/fichas-clinicas/${fichaId || createdFichaId}`)
+      } else if (visitaId) {
+        const existing = await apiGet<FichaClinicaRow[]>(`/fichas-clinicas?visitaId=${visitaId}`)
+        if (existing.length > 0) {
+          ficha = existing[0]
+          setCreatedFichaId(ficha.id)
+        }
+      }
+
+      if (!ficha) {
+        throw new Error('No se encontró la ficha en el servidor.')
+      }
+
       setCurrentVersion(ficha.version)
 
       if (ficha.plantillaFichaId && campos.length > 0) {
@@ -318,7 +334,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
       return
     }
 
-    const errors = validateDynamicFields(fields, campos)
+    const errors = validateDynamicFields(fields, campos, !cerrar)
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       setError('Completa los campos obligatorios antes de guardar.')
@@ -331,40 +347,75 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
     setConflictWarning(false)
 
     try {
-      const payload = buildFichaPayload({
+      let targetFichaId = fichaId ?? createdFichaId
+      let currentFichaVersion = currentVersion
+
+      // 1. Extraer archivos pendientes
+      const nonFileFields = { ...fields }
+      const fileFields: Record<string, File> = {}
+      for (const [k, v] of Object.entries(nonFileFields)) {
+        if (v && typeof v === 'object' && (v as any) instanceof File) {
+          fileFields[k] = v as File
+          delete nonFileFields[k]
+        }
+      }
+
+      // 2. Crear ficha si no existe (POST inicial para obtener ID)
+      if (!targetFichaId) {
+        const initialPayload = buildFichaPayload({
+          visitaId,
+          plantillaFichaId,
+          fields: nonFileFields,
+          observaciones,
+        })
+        const created = await apiPost<FichaClinicaRow, FichaClinicaPayload>('/fichas-clinicas', initialPayload)
+        setCreatedFichaId(created.id)
+        targetFichaId = created.id
+        currentFichaVersion = created.version
+        setFichaEstado(created.estado)
+      }
+
+      // 3. Subir archivos a R2 usando el targetFichaId
+      const finalFields = { ...nonFileFields }
+      for (const [codigo, fileObj] of Object.entries(fileFields)) {
+        const doc = await uploadDocumentoAdjunto({
+          fichaClinicaId: targetFichaId,
+          file: fileObj,
+          categoria: 'GENERAL',
+          descripcion: 'Adjunto de formulario'
+        })
+        finalFields[codigo] = doc.id
+      }
+
+      // Reflejamos los IDs en la UI para que ya no salgan como archivos "Pendientes de subir"
+      if (Object.keys(fileFields).length > 0) {
+        setFields(prev => ({ ...prev, ...finalFields }))
+      }
+
+      // 4. Guardar (PATCH) definitivo con todos los IDs y estados finales
+      const finalPayload = buildFichaPayload({
         visitaId,
         plantillaFichaId,
-        fields,
+        fields: finalFields,
         observaciones,
       })
+      if (cerrar) finalPayload.estado = 'CERRADA'
 
-      if (cerrar) payload.estado = 'CERRADA'
+      const updated = await apiPatch<FichaClinicaRow, FichaClinicaPayload>(
+        `/fichas-clinicas/${targetFichaId}?version=${currentFichaVersion}`,
+        finalPayload,
+      )
+      
+      setCurrentVersion(updated.version)
+      setFichaEstado(updated.estado)
+      setSuccessMsg(cerrar ? 'Ficha clínica cerrada correctamente.' : 'Ficha guardada correctamente.')
+      clearDraft(draftKey)
 
-      const targetFichaId = fichaId ?? createdFichaId
-
-      if (targetFichaId) {
-        // PATCH con version para optimistic locking
-        const updated = await apiPatch<FichaClinicaRow, FichaClinicaPayload>(
-          `/fichas-clinicas/${targetFichaId}?version=${currentVersion}`,
-          payload,
-        )
-        setCurrentVersion(updated.version)
-        setFichaEstado(updated.estado)
-        setSuccessMsg(cerrar ? 'Ficha clínica cerrada correctamente.' : 'Ficha clínica actualizada.')
+      if (cerrar) {
         shouldSaveDraftRef.current = false
-        clearDraft(draftKey)
-      } else {
-        const created = await apiPost<FichaClinicaRow, FichaClinicaPayload>(
-          '/fichas-clinicas',
-          payload,
-        )
-        setCreatedFichaId(created.id)
-        setCurrentVersion(created.version)
-        setFichaEstado(created.estado)
-
-        setSuccessMsg(cerrar ? 'Ficha clínica creada y cerrada.' : 'Ficha clínica creada correctamente.')
-        shouldSaveDraftRef.current = false
-        clearDraft(draftKey)
+        window.setTimeout(() => {
+          window.location.href = '/fichas-clinicas'
+        }, 1000)
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -372,7 +423,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
 
         if (err.message.includes('409') || msg.includes('modificada por otro') || msg.includes('Conflict')) {
           setConflictWarning(true)
-          setError('⚠️ Conflicto de edición: otro profesional modificó esta ficha mientras editabas.')
+          setError('Conflicto de edición: otro profesional modificó esta ficha mientras editabas.')
         } else {
           setError(msg)
         }
@@ -582,6 +633,20 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
                       const inputType = getInputType(campo.tipoCampo)
                       const value = fields[campo.codigoCampo] ?? ''
                       const err = fieldErrors[campo.codigoCampo]
+
+                      if (campo.tipoCampo === 'ARCHIVO') {
+                        return (
+                          <FichaCampoArchivo
+                            key={campo.id}
+                            fichaClinicaId={effectiveFichaId}
+                            campo={campo}
+                            value={String(value)}
+                            onChange={val => updateField(campo.codigoCampo, val)}
+                            isClosed={isClosed}
+                            error={err}
+                          />
+                        )
+                      }
 
                       if (inputType === 'checkbox') {
                         return (

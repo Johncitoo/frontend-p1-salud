@@ -55,6 +55,7 @@ export function fichaToFormValues(
 export function validateDynamicFields(
   fields: Record<string, DynamicFieldValue>,
   campos: PlantillaCampoRow[],
+  skipRequired: boolean = false,
 ): Record<string, string> {
   const errors: Record<string, string> = {}
 
@@ -63,13 +64,13 @@ export function validateDynamicFields(
     const isEmpty = value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
 
     if (campo.obligatorio && isEmpty) {
-      errors[campo.codigoCampo] = `${campo.etiqueta} es obligatorio.`
+      if (!skipRequired) {
+        errors[campo.codigoCampo] = `${campo.etiqueta} es obligatorio.`
+      }
       continue
     }
 
     if (!isEmpty && campo.tipoCampo === 'VARIABLE_CLINICA' && typeof value === 'number') {
-      // Validación de rango si vino info de la variable (se pasa desde el padre)
-      // La API igual valida, esto es UX preview
       if (isNaN(value)) {
         errors[campo.codigoCampo] = 'Ingresa un valor numérico válido.'
       }
@@ -120,3 +121,6 @@ export const emptyFichaForm = (visitaId: string, plantillaFichaId: string): Fich
   fields: {},
   observaciones: '',
 })
+
+export const getOptionEntries = (opciones?: Record<string, unknown>) =>
+  Object.entries(opciones ?? {}).map(([key, value]) => [key, String(value)] as const)

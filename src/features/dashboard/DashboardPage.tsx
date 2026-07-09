@@ -36,7 +36,7 @@ const cards: NavCard[] = [
   { title: 'Usuarios', description: 'Administra perfiles del sistema.', href: '/users', icon: <UserCog className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
   { title: 'Crear usuario', description: 'Registra un usuario y su rol.', href: '/users/new', icon: <UserCog className='size-5' />, roles: ['ADMIN'] },
   { title: 'Crear zona', description: 'Añade una zona de cobertura.', href: '/zones/new', icon: <MapPin className='size-5' />, roles: ['ADMIN', 'COORDINADOR'] },
-  { title: 'Fichas Clínicas', description: 'Registra atenciones con formularios guiados.', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'] },
+  { title: 'Fichas Clínicas', description: 'Registra atenciones con formularios guiados.', href: '/fichas-clinicas', icon: <ClipboardPen className='size-5' />, roles: ['ADMIN', 'PROFESIONAL'] },
   { title: 'Auditoría', description: 'Revisa eventos y trazabilidad.', href: '/audit', icon: <FileText className='size-5' />, roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
@@ -145,7 +145,6 @@ const DashboardPage = () => {
               <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>Accesos rápidos</p>
               <h2 className='m-0 mt-1 text-2xl font-semibold tracking-[-0.025em] text-white'>Módulos disponibles</h2>
             </div>
-            <p className='hidden text-xs font-semibold text-[#D9D9D9] sm:block'>Permisos según perfil {session.rol}</p>
           </div>
 
           <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>

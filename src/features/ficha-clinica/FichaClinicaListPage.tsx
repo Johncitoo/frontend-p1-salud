@@ -8,9 +8,9 @@ import type { PlantillaFichaRow } from './types'
 const FichaClinicaListPage = () => {
   const session = useCurrentUser()
   const canManageTemplates =
-    session.rol === 'ADMIN' || session.rol === 'COORDINADOR'
+    session.rol === 'ADMIN'
   const canFillForms =
-    session.rol === 'ADMIN' || session.rol === 'COORDINADOR' || session.rol === 'PROFESIONAL'
+    session.rol === 'ADMIN' || session.rol === 'PROFESIONAL'
 
   const [query, setQuery] = useState('')
   const [plantillas, setPlantillas] = useState<PlantillaFichaRow[]>([])

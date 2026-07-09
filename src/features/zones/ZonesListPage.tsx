@@ -64,7 +64,7 @@ const ZonesListPage = () => {
             <p className='text-xs font-bold uppercase tracking-[0.18em] text-[#3C6E71]'>
               Cobertura territorial
             </p>
-            <h1 className='m-0 text-3xl font-semibold text-slate-900'>CRUD Zonas</h1>
+            <h1 className='m-0 text-3xl font-semibold text-slate-900'>Zonas de atención</h1>
             <p className='mt-2 text-sm text-slate-600'>
               Administración de zonas de cobertura usadas para pacientes, direcciones y agenda operativa.
             </p>
@@ -80,13 +80,13 @@ const ZonesListPage = () => {
           ) : null}
         </header>
 
-        <div className='mb-4 flex w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2'>
-          <Search className='size-4 text-slate-500' />
+        <div className='relative mb-4 w-full'>
+          <Search className='pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500' />
           <input
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder='Buscar por nombre, comuna, region o descripcion'
-            className='w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400'
+            placeholder='Buscar por nombre, comuna, región o descripción...'
+            className='w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#3C6E71] focus:ring-1 focus:ring-[#3C6E71] transition-colors'
           />
         </div>
 
@@ -102,8 +102,8 @@ const ZonesListPage = () => {
               <tr className='text-xs uppercase tracking-wide text-slate-600'>
                 <th className='px-4 py-3'>Nombre</th>
                 <th className='px-4 py-3'>Comuna</th>
-                <th className='px-4 py-3'>Region</th>
-                <th className='px-4 py-3'>Descripcion</th>
+                <th className='px-4 py-3'>Región</th>
+                <th className='px-4 py-3'>Descripción</th>
                 <th className='px-4 py-3'>Estado</th>
                 <th className='px-4 py-3'>Acciones</th>
               </tr>
@@ -137,7 +137,7 @@ const ZonesListPage = () => {
                       {canWriteZones ? (
                         <a
                           href={`/zones/${zone.id}/edit`}
-                          className='inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+                          className='inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-200 transition-colors'
                         >
                           <Pencil className='size-3' />
                           Editar
@@ -147,7 +147,7 @@ const ZonesListPage = () => {
                         <button
                           type='button'
                           onClick={() => handleDelete(zone)}
-                          className='inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50'
+                          className='inline-flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-red-600 transition-colors'
                         >
                           <Trash2 className='size-3' />
                           Eliminar
@@ -164,7 +164,7 @@ const ZonesListPage = () => {
               {!isLoading && filteredZones.length === 0 && (
                 <tr>
                   <td colSpan={6} className='px-4 py-8 text-center text-sm text-slate-500'>
-                    No hay zonas que coincidan con la busqueda.
+                    No hay zonas que coincidan con la búsqueda.
                   </td>
                 </tr>
               )}

@@ -9,6 +9,9 @@ type PatientRow = {
   apellidos: string
   fechaNacimiento: string | null
   sexo: string | null
+  telefono?: string | null
+  email?: string | null
+  direccion?: string | null
 }
 
 type MedicionRow = {
@@ -243,12 +246,39 @@ export default function PatientProfilePage({ patientId }: { patientId: string })
           <ArrowLeft className='size-4' /> Volver a pacientes
         </a>
         
-        <header className='mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between'>
+        <header className='mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
           <div>
             <h1 className='text-3xl font-semibold text-slate-900'>{patient.nombres} {patient.apellidos}</h1>
-            <p className='mt-2 text-sm text-slate-600'>RUT: {patient.rut}</p>
+            <div className='mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-8 text-sm'>
+              <div className='flex flex-col gap-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>RUT</span>
+                <span className='font-medium text-slate-700'>{patient.rut}</span>
+              </div>
+              <div className='flex flex-col gap-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>Nacimiento</span>
+                <span className='font-medium text-slate-700'>
+                  {patient.fechaNacimiento ? new Date(`${patient.fechaNacimiento}T00:00:00`).toLocaleDateString('es-CL') : '-'}
+                </span>
+              </div>
+              <div className='flex flex-col gap-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>Sexo</span>
+                <span className='font-medium text-slate-700'>{patient.sexo || '-'}</span>
+              </div>
+              <div className='flex flex-col gap-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>Teléfono</span>
+                <span className='font-medium text-slate-700'>{patient.telefono || '-'}</span>
+              </div>
+              <div className='flex flex-col gap-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>Email</span>
+                <span className='font-medium text-slate-700'>{patient.email || '-'}</span>
+              </div>
+              <div className='flex flex-col gap-1 sm:col-span-2 lg:col-span-1'>
+                <span className='text-xs font-semibold uppercase tracking-wider text-slate-500'>Dirección</span>
+                <span className='font-medium text-slate-700'>{patient.direccion || '-'}</span>
+              </div>
+            </div>
           </div>
-          <div className='bg-[#CDE7EA] text-[#284B63] px-4 py-2 rounded-xl font-bold uppercase text-xs tracking-wider'>
+          <div className='bg-[#3C6E71] text-white px-4 py-2 rounded-xl font-bold uppercase text-xs tracking-wider shrink-0 w-fit'>
             Perfil Clínico
           </div>
         </header>

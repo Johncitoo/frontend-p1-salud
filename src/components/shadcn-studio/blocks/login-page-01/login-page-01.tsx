@@ -39,12 +39,12 @@ const Login = () => {
           <div className='absolute bottom-24 right-14 h-40 w-24 rotate-12 rounded-full bg-[#3C6E71]/30 blur-2xl' aria-hidden='true' />
 
           <div className='relative z-10 flex items-center gap-3'>
-            <span className='grid size-12 place-items-center rounded-2xl bg-white text-[#284B63] shadow-lg shadow-[#353535]/20'>
-              <HeartPulse className='size-7' strokeWidth={2.2} aria-hidden='true' />
+            <span className='grid size-12 place-items-center rounded-2xl bg-white shadow-lg shadow-[#353535]/20 overflow-hidden'>
+              <img src="/favicon.png" alt="MediHome Logo" className="size-full object-cover p-1" />
             </span>
             <div>
-              <p className='text-[11px] font-semibold uppercase tracking-[0.24em] text-[#D9D9D9]'>Red asistencial</p>
-              <p className='mt-0.5 text-lg font-semibold tracking-tight text-white'>Salud en Casa</p>
+              <p className='text-[11px] font-semibold uppercase tracking-[0.24em] text-[#D9D9D9]'>Atención domiciliaria</p>
+              <p className='mt-0.5 text-lg font-semibold tracking-tight text-white'>MediHome</p>
             </div>
           </div>
 
@@ -91,12 +91,12 @@ const Login = () => {
           <div className='absolute inset-x-0 top-0 h-1.5 bg-[#3C6E71] lg:hidden' aria-hidden='true' />
           <div className='w-full max-w-[520px]'>
             <div className='mb-10 flex items-center gap-3 lg:hidden'>
-              <span className='grid size-11 place-items-center rounded-2xl bg-[#284B63] text-white'>
-                <HeartPulse className='size-6' aria-hidden='true' />
+              <span className='grid size-11 place-items-center rounded-2xl bg-white shadow-sm overflow-hidden'>
+                <img src="/favicon.png" alt="MediHome Logo" className="size-full object-cover p-1" />
               </span>
               <div>
-                <p className='text-[10px] font-semibold uppercase tracking-[0.22em] text-[#3C6E71]'>Red asistencial</p>
-                <p className='font-semibold text-[#284B63]'>Salud en Casa</p>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.22em] text-[#3C6E71]'>Atención domiciliaria</p>
+                <p className='font-semibold text-[#284B63]'>MediHome</p>
               </div>
             </div>
 
