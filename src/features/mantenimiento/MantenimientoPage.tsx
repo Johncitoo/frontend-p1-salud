@@ -50,7 +50,7 @@ export default function MantenimientoPage() {
   const [finalizarNotas, setFinalizarNotas] = useState('')
   const queryClient = useQueryClient()
   const session = useCurrentUser()
-  const canRegistrar = ['ADMIN', 'COORDINADOR', 'PROFESIONAL'].includes(session.rol)
+  const canRegistrar = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO'].includes(session.rol)
   const canReintentar = ['ADMIN', 'COORDINADOR'].includes(session.rol)
   const canCorregir = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO'].includes(session.rol)
 
