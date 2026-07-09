@@ -1,5 +1,5 @@
-import { apiGet, apiPost } from '@/lib/api'
-import type { CrmTicket, CrmExternalStatus, CreateCrmTicketInput } from './types'
+import { apiGet, apiPost, apiPatch } from '@/lib/api'
+import type { CrmTicket, CrmExternalStatus, CreateCrmTicketInput, CrmEstado } from './types'
 
 export const getCrmTickets = async (params?: {
   estado?: string
@@ -21,4 +21,11 @@ export const getCrmTicketExternalStatus = async (id: string) => {
 // WEB y (solo para altas manuales) genera el ticket en el CRM del Proyecto 07.
 export const createCrmTicket = async (input: CreateCrmTicketInput) => {
   return await apiPost<CrmTicket, CreateCrmTicketInput>('/incidentes-salud', input)
+}
+
+// Cambia el estado local del incidente (solo ADMIN/COORDINADOR). Si el tipo mapea
+// a un evento operacional (visitas de atraso), el backend re-propaga el cambio al
+// Grupo 11 para que cierre/actualice su ticket automáticamente.
+export const updateCrmTicketEstado = async (id: string, estado: CrmEstado) => {
+  return await apiPatch<CrmTicket, { estado: CrmEstado }>(`/incidentes-salud/${id}`, { estado })
 }
