@@ -69,6 +69,7 @@ type AvailableUser = {
   apellidos: string
   email: string
   rut: string
+  rol?: string
 }
 
 type VisitForm = {
@@ -223,6 +224,7 @@ const AgendaPage = () => {
   const [visits, setVisits] = useState<VisitRow[]>([])
   const [patients, setPatients] = useState<PatientRow[]>([])
   const [professionals, setProfessionals] = useState<ProfessionalRow[]>([])
+  const [availableProfessionalUsers, setAvailableProfessionalUsers] = useState<AvailableUser[]>([])
   const [zones, setZones] = useState<ZoneRow[]>([])
   const [prestaciones, setPrestaciones] = useState<PrestacionRow[]>([])
   const [allUsers, setAllUsers] = useState<AvailableUser[]>([])
@@ -270,17 +272,33 @@ const AgendaPage = () => {
     }
   }), [patients])
 
-  const professionalOptions = useMemo<SearchableOption[]>(() => professionals.map(professional => {
-    const user = allUsers.find(u => u.id === professional.usuarioId)
-    const label = user ? `${user.nombres} ${user.apellidos} - ${professional.profesion}` : professional.profesion
-    const helper = professional.numeroRegistro || 'Sin registro'
-    return {
-      value: professional.id,
-      label,
-      helper,
-      searchText: `${label} ${helper}`.toLowerCase(),
-    }
-  }), [professionals, allUsers])
+  const professionalOptions = useMemo<SearchableOption[]>(() => {
+    const registered = professionals.map(professional => {
+      const user = allUsers.find(u => u.id === professional.usuarioId)
+      const label = user ? `${user.nombres} ${user.apellidos} - ${professional.profesion}` : professional.profesion
+      const helper = professional.numeroRegistro || 'Sin registro'
+      return {
+        value: professional.id,
+        label,
+        helper,
+        searchText: `${label} ${helper}`.toLowerCase(),
+      }
+    })
+
+    const available = availableProfessionalUsers.map(user => {
+      const rol = user.rol === 'TECNICO' ? 'TECNICO' : 'PROFESIONAL'
+      const label = `${user.nombres} ${user.apellidos} - ${rol}`
+      const helper = user.rut || user.email
+      return {
+        value: `usuario:${user.id}`,
+        label,
+        helper,
+        searchText: `${label} ${helper}`.toLowerCase(),
+      }
+    })
+
+    return [...registered, ...available]
+  }, [professionals, allUsers, availableProfessionalUsers])
 
   const zoneOptions = useMemo<SearchableOption[]>(() => zones.map(zone => {
     const label = zone.nombre
@@ -313,6 +331,7 @@ const AgendaPage = () => {
       apiGet<CalendarVisitRow[]>(`/visitas/calendario${calParams.toString() ? `?${calParams.toString()}` : ''}`),
       apiGet<PatientRow[]>('/pacientes'),
       apiGet<ProfessionalRow[]>('/profesionales'),
+      apiGet<AvailableUser[]>('/profesionales/usuarios-disponibles'),
       apiGet<ZoneRow[]>('/zonas'),
       apiGet<PrestacionRow[]>('/prestaciones?activa=true'),
       apiGet<AvailableUser[]>('/usuarios'),
@@ -323,7 +342,7 @@ const AgendaPage = () => {
     }
 
     Promise.all(promises)
-      .then(async ([visitRows, calRows, patientRows, professionalRows, zoneRows, prestacionRows, userRows, googleStatus]) => {
+      .then(async ([visitRows, calRows, patientRows, professionalRows, availableUserRows, zoneRows, prestacionRows, userRows, googleStatus]) => {
         const prestacionesEntries = await Promise.all(
           visitRows.map(async visit => {
             const rows = await apiGet<VisitPrestacionRow[]>(`/visitas/${visit.id}/prestaciones`)
@@ -337,6 +356,7 @@ const AgendaPage = () => {
         setPatients(patientRows)
         setAllUsers(userRows)
         setProfessionals(professionalRows.filter(professional => professional.activo))
+        setAvailableProfessionalUsers(availableUserRows)
         setZones(zoneRows.filter(zone => zone.activa))
         setPrestaciones(prestacionRows.filter(prestacion => prestacion.activa))
         setVisitPrestaciones(Object.fromEntries(prestacionesEntries))
@@ -425,9 +445,21 @@ const AgendaPage = () => {
     setSuccessMsg('')
 
     try {
+      let profesionalSaludId = form.profesionalSaludId
+      if (profesionalSaludId.startsWith('usuario:')) {
+        const usuarioId = profesionalSaludId.replace('usuario:', '')
+        const user = availableProfessionalUsers.find(item => item.id === usuarioId)
+        const createdProfessional = await apiPost<ProfessionalRow, Record<string, unknown>>('/profesionales', {
+          usuarioId,
+          profesion: user?.rol === 'TECNICO' ? 'TECNICO' : 'PROFESIONAL',
+          activo: true,
+        })
+        profesionalSaludId = createdProfessional.id
+      }
+
       const payload = {
         pacienteId: form.pacienteId,
-        profesionalSaludId: form.profesionalSaludId,
+        profesionalSaludId,
         zonaId: form.zonaId || undefined,
         fechaProgramada: form.fechaProgramada,
         horaProgramada: form.horaProgramada,

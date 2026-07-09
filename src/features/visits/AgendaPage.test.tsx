@@ -119,6 +119,7 @@ const setupApi = () => {
     if (path.startsWith('/visitas')) return [visit]
     if (path === '/pacientes') return [patient]
     if (path === '/profesionales') return [professional]
+    if (path === '/profesionales/usuarios-disponibles') return []
     if (path === '/zonas') return [zone]
     if (path === '/prestaciones?activa=true') return [prestacion]
     if (path === '/google-calendar/status') return { isConnected: false, syncEnabled: false }
