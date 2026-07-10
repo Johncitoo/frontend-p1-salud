@@ -122,6 +122,8 @@ const setupApi = () => {
     if (path === '/zonas') return [zone]
     if (path === '/prestaciones?activa=true') return [prestacion]
     if (path === '/google-calendar/status') return { isConnected: false, syncEnabled: false }
+    if (path === '/usuarios') return []
+    if (path.startsWith('/alertas')) return []
     throw new Error(`GET no mockeado: ${path}`)
   })
   mocks.apiPost.mockImplementation(async (path: string, body: any) => {

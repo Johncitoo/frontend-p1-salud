@@ -3,6 +3,21 @@ import React from 'react'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const store: Record<string, string> = {};
+const localStorageMock = {
+  getItem: (key: string) => store[key] || null,
+  setItem: (key: string, value: string) => { store[key] = value.toString(); },
+  removeItem: (key: string) => { delete store[key]; },
+  clear: () => { Object.keys(store).forEach(k => delete store[k]); },
+  key: (index: number) => Object.keys(store)[index] || null,
+  get length() { return Object.keys(store).length; },
+};
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+  configurable: true,
+});
 import FichaClinicaFormPage from './FichaClinicaFormPage'
 import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import { saveDraft, clearDraft } from './draftStorage'

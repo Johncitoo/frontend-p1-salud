@@ -137,7 +137,7 @@ const CalendarEventContent = ({ event }: { event: CalendarEvent }) => {
 export default function CalendarView({
   visits,
   onSelectVisit,
-  canEditVisit,
+  canEditVisit = true,
   canFillFicha
 }: CalendarViewProps) {
   const [selectedVisit, setSelectedVisit] = useState<CalendarVisitRow | null>(null)

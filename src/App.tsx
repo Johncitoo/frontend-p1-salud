@@ -120,6 +120,10 @@ function App() {
     )
   }
 
+  if (!profile) {
+    return <LoginPage />
+  }
+
   if (pathname === '/' || pathname === '/auth/login') {
     window.location.href = roleHomePath(profile!.rol)
     return null

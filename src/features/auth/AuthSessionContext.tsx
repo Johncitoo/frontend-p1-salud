@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
-import { createLocalMockProfile, getMockSession } from './mockAuth'
+import { createLocalMockProfile, getMockSession, logoutMock } from './mockAuth'
 import {
   getKeycloakAccessRoles,
   hasKeycloakAccessRole,
@@ -117,7 +117,12 @@ export function AuthSessionProvider({ children }: { children: React.ReactNode })
       profile,
       keycloakRoles,
       error,
-      logout: logoutFromKeycloak,
+      logout: IS_MOCK ? () => {
+        logoutMock()
+        setProfile(null)
+        setStatus('authenticated')
+        window.location.href = '/'
+      } : logoutFromKeycloak,
     }),
     [error, keycloakRoles, profile, status],
   )

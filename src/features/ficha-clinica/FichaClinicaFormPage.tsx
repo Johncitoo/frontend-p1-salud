@@ -96,6 +96,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [draftExpirationMsg, setDraftExpirationMsg] = useState('')
   const [conflictWarning, setConflictWarning] = useState(false)
   const [isLoadingVisits, setIsLoadingVisits] = useState(false)
   const [isCreatingVisit, setIsCreatingVisit] = useState(false)
@@ -185,6 +186,15 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
           setFields(draft.value.fields)
           setObservaciones(draft.value.observaciones)
           setSuccessMsg(`Borrador local restaurado. Ultimo guardado: ${new Date(draft.savedAt).toLocaleString('es-CL')}.`)
+
+          const savedAtMs = new Date(draft.savedAt).getTime()
+          const timeElapsed = Date.now() - savedAtMs
+          const timeLeftMs = 8 * 60 * 60 * 1000 - timeElapsed
+          const timeLeftHours = timeLeftMs / (60 * 60 * 1000)
+          if (timeLeftHours < 2) {
+            const minutesLeft = Math.round(timeLeftMs / (60 * 1000))
+            setDraftExpirationMsg(`Advertencia: Este borrador expira y se borrará automáticamente en ${minutesLeft} minutos para proteger datos confidenciales. Asegúrate de guardar los cambios pronto.`)
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -344,6 +354,7 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
     setIsSaving(true)
     setError('')
     setSuccessMsg('')
+    setDraftExpirationMsg('')
     setConflictWarning(false)
 
     try {
@@ -504,6 +515,12 @@ const FichaClinicaFormPage = ({ fichaId, visitaId: propVisitaId }: FichaClinicaF
         {successMsg && (
           <div className='mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800'>
             {successMsg}
+          </div>
+        )}
+
+        {draftExpirationMsg && (
+          <div className='mb-5 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-800'>
+            {draftExpirationMsg}
           </div>
         )}
 
